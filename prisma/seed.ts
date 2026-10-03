@@ -135,7 +135,7 @@ async function main() {
     create: {
       email: "admin.test@csjmu.local",
       fullName: "Test System Administrator",
-      role: UserRole.ADMIN,
+      role: UserRole.SYSTEM_ADMIN,
       passwordHash: FAKE_DEV_PASSWORD_HASH,
       phoneNumber: "9876500001",
       isActive: true,
@@ -167,7 +167,7 @@ async function main() {
     create: {
       email: "hod.math.test@csjmu.local",
       fullName: "Test HoD Mathematics",
-      role: UserRole.HOD,
+      role: UserRole.DEPARTMENT_HEAD,
       passwordHash: FAKE_DEV_PASSWORD_HASH,
       phoneNumber: "9876500003",
       isActive: true,
@@ -227,7 +227,7 @@ async function main() {
     await prisma.staffAssignment.create({
       data: {
         userId: testHodMath.id,
-        role: UserRole.HOD,
+        role: UserRole.DEPARTMENT_HEAD,
         departmentId: departments["MATH"].id,
         courseId: null, // HoD oversees entire department
         isActive: true,

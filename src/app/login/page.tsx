@@ -2,25 +2,89 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { NoticeBanner } from "@/components/NoticeBanner";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   LogIn,
-  User,
   Shield,
-  KeyRound,
   GraduationCap,
   Briefcase,
   AlertCircle,
-  Info,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 
 export default function LoginPage() {
-  const [activeTab, setActiveTab] = useState<"student" | "staff">("student");
-  const [submitted, setSubmitted] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams.get("redirect") || "";
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [activeTab, setActiveTab] = useState<"student" | "staff">("student");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const identifier = formData.get("identifier");
+    const password = formData.get("password");
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier,
+          password,
+          portalType: activeTab,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setErrorMessage(data.error || "Authentication failed.");
+        setLoading(false);
+        return;
+      }
+
+      setSuccessMessage("Authenticated successfully! Loading portal workspace...");
+
+      // Role-based destination redirect
+      setTimeout(() => {
+        if (redirectTarget) {
+          router.push(redirectTarget);
+        } else {
+          switch (data.user?.role) {
+            case "STUDENT":
+              router.push("/student");
+              break;
+            case "COURSE_COORDINATOR":
+              router.push("/coordinator");
+              break;
+            case "DEPARTMENT_HEAD":
+              router.push("/department-head");
+              break;
+            case "DIRECTOR":
+              router.push("/director");
+              break;
+            case "SYSTEM_ADMIN":
+              router.push("/admin");
+              break;
+            default:
+              router.push("/");
+          }
+        }
+        router.refresh();
+      }, 1000);
+    } catch {
+      setErrorMessage("Network error occurred during login. Please check database connectivity.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -38,22 +102,31 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* Non-Functional Banner */}
-      <NoticeBanner
-        title="Foundation Phase Notice: Non-Functional Login"
-        message="Authentication endpoints, session token signing, and Argon2id password verification will be implemented in Phase 1. Form submission is deactivated for foundation review."
-        variant="warning"
-      />
+      {/* Error / Success Alerts */}
+      {errorMessage && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-900 flex items-start gap-2.5"
+        >
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <strong>Sign In Failed:</strong>
+            <p className="mt-0.5">{errorMessage}</p>
+          </div>
+        </div>
+      )}
 
-      {submitted && (
+      {successMessage && (
         <div
           role="status"
           aria-live="polite"
-          className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-2.5"
+          className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 flex items-start gap-2.5"
         >
-          <Info className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" aria-hidden="true" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
-            <strong>Preview Attempt Handled:</strong> Real credential authentication is not yet enabled. No fake credentials or mock auth states are active.
+            <strong>Success:</strong>
+            <p className="mt-0.5">{successMessage}</p>
           </div>
         </div>
       )}
@@ -61,16 +134,20 @@ export default function LoginPage() {
       {/* Login Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
         {/* Role Selector Tabs */}
-        <div className="flex rounded-lg bg-slate-100 p-1 border border-slate-200" role="tablist" aria-label="Login user type">
+        <div
+          className="flex rounded-lg bg-slate-100 p-1 border border-slate-200"
+          role="tablist"
+          aria-label="Login user type"
+        >
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "student"}
             onClick={() => {
               setActiveTab("student");
-              setSubmitted(false);
+              setErrorMessage(null);
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-bold transition ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-bold transition cursor-pointer ${
               activeTab === "student"
                 ? "bg-white text-csjmu-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -86,9 +163,9 @@ export default function LoginPage() {
             aria-selected={activeTab === "staff"}
             onClick={() => {
               setActiveTab("staff");
-              setSubmitted(false);
+              setErrorMessage(null);
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-bold transition ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-bold transition cursor-pointer ${
               activeTab === "staff"
                 ? "bg-white text-csjmu-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -103,7 +180,7 @@ export default function LoginPage() {
         <div className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-100">
           {activeTab === "student" ? (
             <p>
-              Access your personal grievance dashboard, view coordinator remarks, and respond to document requests.
+              Access your student grievance dashboard, view coordinator remarks, and respond to document requests.
             </p>
           ) : (
             <p>
@@ -116,18 +193,17 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="identifier" className="block text-xs font-semibold text-slate-700 mb-1">
-              {activeTab === "student" ? "CSJMU Roll Number or Email" : "Institutional Email ID"} <span className="text-rose-500">*</span>
+              {activeTab === "student" ? "CSJMU Roll Number or Email" : "Institutional Email ID"}{" "}
+              <span className="text-rose-500">*</span>
             </label>
-            <div className="relative">
-              <input
-                id="identifier"
-                name="identifier"
-                type="text"
-                required
-                placeholder={activeTab === "student" ? "e.g. 240103001 or email" : "official@csjmu.ac.in"}
-                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-              />
-            </div>
+            <input
+              id="identifier"
+              name="identifier"
+              type="text"
+              required
+              placeholder={activeTab === "student" ? "e.g. 240103001 or email" : "official@csjmu.ac.in"}
+              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+            />
           </div>
 
           <div>
@@ -135,28 +211,33 @@ export default function LoginPage() {
               <label htmlFor="password" className="block text-xs font-semibold text-slate-700">
                 Password <span className="text-rose-500">*</span>
               </label>
-              <span className="text-[11px] text-slate-500 cursor-default">
-                Forgot password?
-              </span>
             </div>
-            <div className="relative">
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                placeholder="Enter account password"
-                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-              />
-            </div>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              placeholder="Enter account password"
+              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+            />
           </div>
 
           <button
             type="submit"
-            className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-sm focus-visible:ring-csjmu-600 mt-2"
+            disabled={loading}
+            className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-sm focus-visible:ring-csjmu-600 disabled:opacity-50 cursor-pointer mt-2"
           >
-            <LogIn className="w-4 h-4" aria-hidden="true" />
-            <span>Sign In to {activeTab === "student" ? "Student Account" : "Staff Console"}</span>
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                <span>Verifying Credentials...</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" aria-hidden="true" />
+                <span>Sign In to {activeTab === "student" ? "Student Account" : "Staff Console"}</span>
+              </>
+            )}
           </button>
         </form>
 

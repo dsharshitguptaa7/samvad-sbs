@@ -19,9 +19,9 @@ generator client {
 enum UserRole {
   STUDENT
   COURSE_COORDINATOR
-  HOD
+  DEPARTMENT_HEAD
   DIRECTOR
-  ADMIN
+  SYSTEM_ADMIN
 }
 
 enum GrievanceTier {

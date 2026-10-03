@@ -1,11 +1,63 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Menu, X, Shield, User, LogIn, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, X, Shield, User, LogIn, Search, LogOut } from "lucide-react";
+
+interface CurrentUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+}
 
 export function Navbar() {
+  const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  useEffect(() => {
+    // Check if session exists
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.success && data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+        }
+      })
+      .catch(() => setCurrentUser(null));
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      setCurrentUser(null);
+      router.push("/login");
+      router.refresh();
+    } catch {
+      router.push("/login");
+    }
+  };
+
+  const getDashboardHref = (role: string) => {
+    switch (role) {
+      case "STUDENT":
+        return "/student";
+      case "SYSTEM_ADMIN":
+        return "/admin";
+      case "COURSE_COORDINATOR":
+        return "/coordinator";
+      case "DEPARTMENT_HEAD":
+        return "/department-head";
+      case "DIRECTOR":
+        return "/director";
+      default:
+        return "/";
+    }
+  };
 
   return (
     <>
@@ -88,20 +140,46 @@ export function Navbar() {
 
               <div className="h-6 w-px bg-csjmu-700 mx-2" aria-hidden="true" />
 
-              <Link
-                href="/register"
-                className="px-3.5 py-2 rounded-md text-sm font-medium text-white bg-csjmu-800 hover:bg-csjmu-700 transition flex items-center gap-1.5 border border-csjmu-700 focus-visible:ring-white"
-              >
-                <User className="w-4 h-4 text-slate-300" aria-hidden="true" />
-                Student Sign Up
-              </Link>
-              <Link
-                href="/login"
-                className="px-4 py-2 rounded-md text-sm font-semibold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition flex items-center gap-1.5 shadow focus-visible:ring-white"
-              >
-                <LogIn className="w-4 h-4" aria-hidden="true" />
-                Portal Login
-              </Link>
+              {currentUser ? (
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={getDashboardHref(currentUser.role)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-csjmu-800 border border-csjmu-700 text-xs font-semibold text-white hover:bg-csjmu-750"
+                  >
+                    <User className="w-3.5 h-3.5 text-gold-400" />
+                    <span>{currentUser.fullName}</span>
+                    <span className="text-[10px] bg-gold-400/20 text-gold-300 px-1.5 py-0.5 rounded border border-gold-400/30">
+                      {currentUser.role}
+                    </span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-950/40 border border-rose-900/50 transition cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Link
+                    href="/register"
+                    className="px-3.5 py-2 rounded-md text-sm font-medium text-white bg-csjmu-800 hover:bg-csjmu-700 transition flex items-center gap-1.5 border border-csjmu-700 focus-visible:ring-white"
+                  >
+                    <User className="w-4 h-4 text-slate-300" aria-hidden="true" />
+                    Student Sign Up
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="px-4 py-2 rounded-md text-sm font-semibold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition flex items-center gap-1.5 shadow focus-visible:ring-white"
+                  >
+                    <LogIn className="w-4 h-4" aria-hidden="true" />
+                    Portal Login
+                  </Link>
+                </>
+              )}
             </nav>
 
             {/* Mobile Menu Button */}
@@ -155,20 +233,44 @@ export function Navbar() {
               Track Grievance
             </Link>
             <div className="pt-4 border-t border-csjmu-800 space-y-2">
-              <Link
-                href="/register"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full text-center block px-4 py-2.5 rounded-md text-sm font-semibold text-white bg-csjmu-800 hover:bg-csjmu-700"
-              >
-                Student Sign Up
-              </Link>
-              <Link
-                href="/login"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full text-center block px-4 py-2.5 rounded-md text-sm font-semibold text-csjmu-950 bg-gold-400 hover:bg-gold-500"
-              >
-                Portal Login (Student & Staff)
-              </Link>
+              {currentUser ? (
+                <>
+                  <Link
+                    href={getDashboardHref(currentUser.role)}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full text-center block px-4 py-2.5 rounded-md text-sm font-semibold text-white bg-csjmu-800"
+                  >
+                    Dashboard ({currentUser.role})
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full text-center block px-4 py-2.5 rounded-md text-sm font-semibold text-rose-300 bg-rose-950/40"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/register"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full text-center block px-4 py-2.5 rounded-md text-sm font-semibold text-white bg-csjmu-800 hover:bg-csjmu-700"
+                  >
+                    Student Sign Up
+                  </Link>
+                  <Link
+                    href="/login"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full text-center block px-4 py-2.5 rounded-md text-sm font-semibold text-csjmu-950 bg-gold-400 hover:bg-gold-500"
+                  >
+                    Portal Login (Student & Staff)
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { NoticeBanner } from "@/components/NoticeBanner";
+import { useRouter } from "next/navigation";
 import {
   UserPlus,
   Shield,
@@ -10,14 +10,18 @@ import {
   Mail,
   Lock,
   Phone,
-  ArrowRight,
-  Info,
-  CheckCircle,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 
 export default function StudentRegisterPage() {
+  const router = useRouter();
   const [selectedDept, setSelectedDept] = useState("MATH");
-  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState("B.Sc. Mathematics");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const coursesByDept: Record<string, string[]> = {
     MATH: ["B.Sc. Mathematics", "M.Sc. Mathematics", "Ph.D. Mathematics"],
@@ -27,9 +31,64 @@ export default function StudentRegisterPage() {
     ENVS: ["M.Sc. Environmental Science", "Ph.D. Environmental Science"],
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleDeptChange = (deptCode: string) => {
+    setSelectedDept(deptCode);
+    const available = coursesByDept[deptCode];
+    if (available && available.length > 0) {
+      setSelectedCourse(available[0]);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setFormSubmitted(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const payload = {
+      fullName: formData.get("fullName"),
+      rollNumber: formData.get("rollNumber"),
+      enrollmentNo: formData.get("enrollmentNo"),
+      departmentCode: selectedDept,
+      courseName: selectedCourse,
+      semester: formData.get("semester"),
+      email: formData.get("email"),
+      phoneNumber: formData.get("phoneNumber"),
+      password: formData.get("password"),
+    };
+
+    const confirmPassword = formData.get("confirmPassword");
+    if (payload.password !== confirmPassword) {
+      setErrorMessage("Passwords do not match. Please re-enter.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setErrorMessage(data.error || "Registration failed. Please check your details.");
+        setLoading(false);
+        return;
+      }
+
+      setSuccessMessage("Account registered successfully! Redirecting to student workspace...");
+      setTimeout(() => {
+        router.push("/student");
+        router.refresh();
+      }, 1200);
+    } catch {
+      setErrorMessage("Network error occurred during registration. Please verify database connectivity.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -48,25 +107,31 @@ export default function StudentRegisterPage() {
         </p>
       </div>
 
-      {/* Non-Functional Banner */}
-      <NoticeBanner
-        title="Foundation Phase Notice: Non-Functional Form"
-        message="This registration form is currently in foundation preview mode. Interactive account provisioning, password hashing, and database persistence will be connected in Phase 1 (Authentication & Session Engine). Form submissions are deactivated."
-        variant="warning"
-      />
+      {/* Status Messages */}
+      {errorMessage && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-900 flex items-start gap-3"
+        >
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <strong>Registration Error:</strong>
+            <p className="mt-0.5">{errorMessage}</p>
+          </div>
+        </div>
+      )}
 
-      {formSubmitted && (
+      {successMessage && (
         <div
           role="status"
           aria-live="polite"
-          className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900 flex items-start gap-3"
+          className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-900 flex items-start gap-3"
         >
-          <Info className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" aria-hidden="true" />
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
-            <strong>Preview Submission Handled:</strong>
-            <p className="mt-0.5">
-              Registration forms are intentionally nonfunctional at the foundation stage. No credentials have been stored. Full authentication is slated for Phase 1.
-            </p>
+            <strong>Success:</strong>
+            <p className="mt-0.5">{successMessage}</p>
           </div>
         </div>
       )}
@@ -148,9 +213,8 @@ export default function StudentRegisterPage() {
                 </label>
                 <select
                   id="department"
-                  name="department"
                   value={selectedDept}
-                  onChange={(e) => setSelectedDept(e.target.value)}
+                  onChange={(e) => handleDeptChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
                 >
                   <option value="MATH">Department of Mathematics</option>
@@ -167,7 +231,8 @@ export default function StudentRegisterPage() {
                 </label>
                 <select
                   id="course"
-                  name="course"
+                  value={selectedCourse}
+                  onChange={(e) => setSelectedCourse(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
                 >
                   {coursesByDept[selectedDept]?.map((crs) => (
@@ -192,67 +257,62 @@ export default function StudentRegisterPage() {
                 <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1">
                   Institutional / Personal Email <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    placeholder="student@csjmu.ac.in"
-                    className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-                  />
-                </div>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="student@csjmu.ac.in"
+                  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+                />
                 <p className="mt-1 text-[11px] text-slate-500">
                   Used for grievance status alerts and document clarification notices.
                 </p>
               </div>
 
               <div>
-                <label htmlFor="phone" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mobile Number <span className="text-rose-500">*</span>
+                <label htmlFor="phoneNumber" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Mobile Number (10 digits) <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    required
-                    placeholder="e.g. 9876543210"
-                    className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-                  />
-                </div>
+                <input
+                  id="phoneNumber"
+                  name="phoneNumber"
+                  type="tel"
+                  required
+                  pattern="[6-9][0-9]{9}"
+                  placeholder="e.g. 9876543210"
+                  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+                />
               </div>
 
               <div>
                 <label htmlFor="password" className="block text-xs font-semibold text-slate-700 mb-1">
                   Create Password <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    placeholder="Min 8 chars, 1 uppercase, 1 symbol"
-                    className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-                  />
-                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  minLength={8}
+                  placeholder="Min 8 chars, 1 uppercase, 1 symbol"
+                  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+                />
               </div>
 
               <div>
                 <label htmlFor="confirmPassword" className="block text-xs font-semibold text-slate-700 mb-1">
                   Confirm Password <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    required
-                    placeholder="Re-enter password"
-                    className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-                  />
-                </div>
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  required
+                  minLength={8}
+                  placeholder="Re-enter password"
+                  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+                />
               </div>
             </div>
           </div>
@@ -282,10 +342,20 @@ export default function StudentRegisterPage() {
 
             <button
               type="submit"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-md focus-visible:ring-csjmu-600"
+              disabled={loading}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-md focus-visible:ring-csjmu-600 disabled:opacity-50 cursor-pointer"
             >
-              <UserPlus className="w-4 h-4" aria-hidden="true" />
-              <span>Submit Registration (Preview)</span>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  <span>Registering Account...</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4" aria-hidden="true" />
+                  <span>Submit Registration</span>
+                </>
+              )}
             </button>
           </div>
         </form>

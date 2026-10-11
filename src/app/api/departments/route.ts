@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Public Academic Master Data Endpoint
  * Returns only active departments and their active course programs.

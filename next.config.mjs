@@ -5,6 +5,15 @@ const nextConfig = {
     // ESLint is independently verified via `npm run lint`
     ignoreDuringBuilds: true,
   },
+  async rewrites() {
+    const fastApiUrl = process.env.FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${fastApiUrl}/api/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

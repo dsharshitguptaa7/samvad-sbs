@@ -1,0 +1,31 @@
+from backend.app.models.entities import (
+    User,
+    Session,
+    PasswordResetToken,
+    Department,
+    Course,
+    StaffAssignment,
+    Grievance,
+    GrievanceDocument,
+    DocumentRequest,
+    GrievanceTimelineAction,
+    SystemAuditLog,
+    WorkflowConfiguration,
+    WorkflowAuditLog,
+)
+
+__all__ = [
+    "User",
+    "Session",
+    "PasswordResetToken",
+    "Department",
+    "Course",
+    "StaffAssignment",
+    "Grievance",
+    "GrievanceDocument",
+    "DocumentRequest",
+    "GrievanceTimelineAction",
+    "SystemAuditLog",
+    "WorkflowConfiguration",
+    "WorkflowAuditLog",
+]

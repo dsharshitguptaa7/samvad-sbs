@@ -7,6 +7,8 @@ import { CourseManager } from "@/components/admin/CourseManager";
 import { StaffManager } from "@/components/admin/StaffManager";
 import { AssignmentManager } from "@/components/admin/AssignmentManager";
 import { RoutingMatrixViewer } from "@/components/admin/RoutingMatrixViewer";
+import { WorkflowConfigManager } from "@/components/admin/WorkflowConfigManager";
+import { Sliders } from "lucide-react";
 
 interface AdminClientDashboardProps {
   userEmail: string;
@@ -14,8 +16,8 @@ interface AdminClientDashboardProps {
 
 export function AdminClientDashboard({ userEmail }: AdminClientDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "departments" | "courses" | "staff" | "assignments" | "semester-matrix" | "routing" | "overview"
-  >("staff");
+    "departments" | "courses" | "staff" | "assignments" | "semester-matrix" | "routing" | "workflow" | "overview"
+  >("workflow");
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -94,6 +96,19 @@ export function AdminClientDashboard({ userEmail }: AdminClientDashboardProps) {
           >
             <GitCommit className="w-4 h-4" />
             <span>Routing Matrix</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("workflow")}
+            className={`inline-flex items-center gap-2 py-3 px-3.5 text-xs sm:text-sm font-bold border-b-2 transition-colors ${
+              activeTab === "workflow"
+                ? "border-csjmu-900 text-csjmu-950 bg-slate-50/50 text-gold-600"
+                : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+            }`}
+            aria-current={activeTab === "workflow" ? "page" : undefined}
+          >
+            <Sliders className="w-4 h-4 text-csjmu-700" />
+            <span>Workflow &amp; Routing Settings</span>
           </button>
 
           <button
@@ -200,6 +215,22 @@ export function AdminClientDashboard({ userEmail }: AdminClientDashboardProps) {
               </div>
             </div>
             <RoutingMatrixViewer />
+          </section>
+        )}
+
+        {activeTab === "workflow" && (
+          <section aria-labelledby="workflow-settings-heading" className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div>
+                <h2 id="workflow-settings-heading" className="text-lg font-bold text-slate-900">
+                  Workflow &amp; Routing Settings
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Configure global grievance resolution routing between HOD-Direct and Coordinator multi-tier modes with pre-flight safety verification.
+                </p>
+              </div>
+            </div>
+            <WorkflowConfigManager onNavigateTab={(tab) => setActiveTab(tab as any)} />
           </section>
         )}
 

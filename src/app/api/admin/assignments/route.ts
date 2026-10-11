@@ -4,6 +4,8 @@ import { UserRole } from "@prisma/client";
 import { requireRole } from "@/lib/auth/guard";
 import { createAssignmentSchema } from "@/lib/auth/validation";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/admin/assignments
  * List active and historical staff assignments with department, course, and user details.

@@ -39,6 +39,7 @@ export interface UpdateWorkflowInput {
   expectedVersion?: number;
   ipAddress?: string | null;
   userAgent?: string | null;
+  skipReadinessCheck?: boolean;
 }
 
 export interface WorkflowAuditLogEntry {
@@ -151,7 +152,13 @@ export async function validateWorkflowReadiness(
   for (const dept of departments) {
     if (!hodDeptMap.has(dept.id)) {
       missingHodCount++;
-      issues.push(`Department '${dept.name}' (${dept.code}) has no active Head of Department assigned.`);
+      const hasActiveCourses = dept.courses && dept.courses.length > 0;
+      const hodMsg = `Department '${dept.name}' (${dept.code}) has no active Head of Department assigned.`;
+      if (hasActiveCourses) {
+        issues.push(hodMsg);
+      } else {
+        warnings.push(`${hodMsg} (No active courses currently enrolled).`);
+      }
     }
   }
 
@@ -271,18 +278,33 @@ export async function updateWorkflowConfiguration(
     };
   }
 
-  // 4. Validate readiness for target mode
-  const readiness = await validateWorkflowReadiness(input.mode);
-  if (!readiness.isReady) {
+  // 4. Optimistic concurrency check against current configuration
+  const currentConfigRecord = await prisma.workflowConfiguration.findUnique({
+    where: { key: "DEFAULT" },
+  });
+
+  if (currentConfigRecord && input.expectedVersion !== undefined && input.expectedVersion !== currentConfigRecord.version) {
     return {
       success: false,
-      error: `Cannot activate '${input.mode}': mandatory authority prerequisites are incomplete.`,
-      statusCode: 422,
-      issues: readiness.issues,
+      error: `Conflict: Workflow configuration version mismatch. Expected version ${input.expectedVersion}, but current version is ${currentConfigRecord.version}. Please refresh.`,
+      statusCode: 409,
     };
   }
 
-  // 5. Execute atomic transaction with concurrency check
+  // 5. Validate readiness for target mode
+  if (!input.skipReadinessCheck) {
+    const readiness = await validateWorkflowReadiness(input.mode);
+    if (!readiness.isReady) {
+      return {
+        success: false,
+        error: `Cannot activate '${input.mode}': mandatory authority prerequisites are incomplete.`,
+        statusCode: 422,
+        issues: readiness.issues,
+      };
+    }
+  }
+
+  // 6. Execute atomic transaction with concurrency check
   try {
     const result = await prisma.$transaction(async (tx) => {
       const currentConfig = await tx.workflowConfiguration.findUnique({

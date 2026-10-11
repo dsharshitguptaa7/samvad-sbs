@@ -4,6 +4,8 @@ import { requireRole, handleAuthError } from "@/lib/auth/guard";
 import { createDepartmentSchema } from "@/lib/auth/validation";
 import { UserRole } from "@prisma/client";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/admin/departments
  * Admin listing of all departments with course counts and audit timestamps.

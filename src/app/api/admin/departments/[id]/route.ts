@@ -4,6 +4,8 @@ import { requireRole, handleAuthError } from "@/lib/auth/guard";
 import { updateDepartmentSchema } from "@/lib/auth/validation";
 import { UserRole } from "@prisma/client";
 
+export const dynamic = "force-dynamic";
+
 interface RouteParams {
   params: { id: string };
 }

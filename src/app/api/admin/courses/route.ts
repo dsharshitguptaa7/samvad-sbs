@@ -4,6 +4,8 @@ import { requireRole, handleAuthError } from "@/lib/auth/guard";
 import { createCourseSchema } from "@/lib/auth/validation";
 import { UserRole } from "@prisma/client";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/admin/courses
  * Lists all courses with department info and currently active coordinator assignments.

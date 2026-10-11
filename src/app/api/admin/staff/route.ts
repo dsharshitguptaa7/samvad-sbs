@@ -7,6 +7,8 @@ import { createPasswordResetToken } from "@/lib/auth/password-reset";
 import { hashPassword } from "@/lib/auth/password";
 import crypto from "crypto";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/admin/staff
  * List all staff accounts with their roles, active assignments, and status.

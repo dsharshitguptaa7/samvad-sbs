@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import { requireRole } from "@/lib/auth/guard";
 
+export const dynamic = "force-dynamic";
+
 /**
  * DELETE /api/admin/assignments/[id]
  * Deactivate / unassign an authority assignment.

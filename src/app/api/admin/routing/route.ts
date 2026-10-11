@@ -3,6 +3,8 @@ import { UserRole } from "@prisma/client";
 import { requireRole } from "@/lib/auth/guard";
 import { resolveAuthorityChain, validateSchoolAuthorityMatrix } from "@/lib/routing/authority-chain";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/admin/routing
  * Inspect authority chain resolutions:

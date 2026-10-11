@@ -43,6 +43,7 @@ interface MatrixReport {
   completeCourses: number;
   incompleteCourses: number;
   activeDirector: AuthorityNode | null;
+  workflowMode?: string;
   chains: ChainItem[];
 }
 
@@ -84,7 +85,7 @@ export function RoutingMatrixViewer() {
           }`}
         >
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider">
               {report.allValid ? (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -95,6 +96,11 @@ export function RoutingMatrixViewer() {
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
                   <span className="text-amber-800">Action Required: Unresolved Routing Chains</span>
                 </>
+              )}
+              {report.workflowMode && (
+                <span className="ml-2 px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-csjmu-900 text-gold-300 border border-csjmu-800 normal-case">
+                  Mode: {report.workflowMode}
+                </span>
               )}
             </div>
             <h3 className="text-lg font-extrabold tracking-tight">

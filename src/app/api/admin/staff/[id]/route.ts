@@ -6,6 +6,8 @@ import { updateStaffProfileSchema } from "@/lib/auth/validation";
 import { revokeAllUserSessions } from "@/lib/auth/session";
 import { createPasswordResetToken } from "@/lib/auth/password-reset";
 
+export const dynamic = "force-dynamic";
+
 /**
  * PATCH /api/admin/staff/[id]
  * Update staff profile or activate/deactivate account.

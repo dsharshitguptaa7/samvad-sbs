@@ -1,9 +1,12 @@
+import logging
 import os
 import uuid
 import hashlib
 import aiofiles
 from fastapi import UploadFile, HTTPException, status
 from backend.app.core.config import settings
+
+logger = logging.getLogger("samvad.storage")
 
 ALLOWED_MIME_TYPES = {
     "application/pdf",
@@ -37,6 +40,34 @@ class StorageService:
     def __init__(self):
         self.base_dir = os.path.abspath(settings.STORAGE_LOCAL_DIR)
         os.makedirs(self.base_dir, exist_ok=True)
+
+    def verify_storage_health(self) -> None:
+        """Verify storage directory exists and has write permission at startup."""
+        os.makedirs(self.base_dir, exist_ok=True)
+        probe_name = f".probe_{uuid.uuid4().hex}.tmp"
+        probe_path = os.path.join(self.base_dir, probe_name)
+        try:
+            with open(probe_path, "w") as f:
+                f.write("samvad_storage_health_probe")
+            if os.path.exists(probe_path):
+                os.remove(probe_path)
+            logger.info("Storage directory '%s' is verified writable.", self.base_dir)
+        except Exception as e:
+            logger.error("FATAL: Storage directory '%s' is NOT writable: %s", self.base_dir, e)
+            raise RuntimeError(f"Storage directory '{self.base_dir}' is not writable: {e}")
+
+    async def delete_file(self, storage_key: str) -> bool:
+        """Safely delete file from disk by storageKey (UUID)."""
+        safe_key = os.path.basename(storage_key)
+        target_path = os.path.join(self.base_dir, safe_key)
+        if os.path.exists(target_path):
+            try:
+                os.remove(target_path)
+                return True
+            except OSError as e:
+                logger.warning("Failed to remove file '%s': %s", target_path, e)
+                return False
+        return False
 
     async def save_file(self, upload_file: UploadFile) -> dict:
         content = await upload_file.read()

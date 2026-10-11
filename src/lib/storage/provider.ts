@@ -93,6 +93,8 @@ class LocalDiskStorageProvider implements StorageProvider {
   constructor() {
     this.baseDir = process.env.STORAGE_LOCAL_DIR
       ? path.resolve(process.env.STORAGE_LOCAL_DIR)
+      : process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+      ? path.resolve("/tmp", ".storage", "grievances")
       : path.resolve(process.cwd(), ".storage", "grievances");
   }
 

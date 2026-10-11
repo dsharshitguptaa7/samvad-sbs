@@ -75,7 +75,9 @@ async def submit_grievance(
     description: str = Form(...),
     reliefSought: Optional[str] = Form(None),
     semester: Optional[int] = Form(None),
+    declarationConfirmed: Optional[str] = Form(None),
     documents: List[UploadFile] = File([]),
+    files: List[UploadFile] = File([]),
     current_user: User = Depends(require_role(["STUDENT"])),
     db: DbSession = Depends(get_db),
 ):
@@ -155,9 +157,12 @@ async def submit_grievance(
 
     # 6. Save attached documents
     uploaded_records = []
-    for doc in documents:
-        if doc and doc.filename:
+    saved_storage_keys = []
+    upload_list = [f for f in (documents + files) if f and f.filename]
+    try:
+        for doc in upload_list:
             file_meta = await storage_service.save_file(doc)
+            saved_storage_keys.append(file_meta["storageKey"])
             doc_record = GrievanceDocument(
                 grievanceId=grievance.id,
                 uploadedById=current_user.id,
@@ -170,6 +175,10 @@ async def submit_grievance(
             )
             db.add(doc_record)
             uploaded_records.append(doc_record)
+    except Exception as exc:
+        for key in saved_storage_keys:
+            await storage_service.delete_file(key)
+        raise exc
 
     db.commit()
     db.refresh(grievance)
@@ -177,6 +186,8 @@ async def submit_grievance(
     return {
         "success": True,
         "message": "Grievance submitted successfully.",
+        "trackingNumber": grievance.trackingNumber,
+        "grievanceId": grievance.id,
         "grievance": {
             "id": grievance.id,
             "trackingNumber": grievance.trackingNumber,

@@ -19,6 +19,38 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const fastApiUrl = process.env.FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (fastApiUrl) {
+      const forwardHeaders = new Headers();
+      const cookie = req.headers.get("cookie");
+      if (cookie) forwardHeaders.set("cookie", cookie);
+      const auth = req.headers.get("authorization");
+      if (auth) forwardHeaders.set("authorization", auth);
+
+      const res = await fetch(`${fastApiUrl}/api/documents/${params.id}`, {
+        method: "GET",
+        headers: forwardHeaders,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: "Document fetch failed" }));
+        return NextResponse.json(errorData, { status: res.status });
+      }
+
+      const responseHeaders = new Headers();
+      ["content-type", "content-length", "content-disposition", "cache-control", "x-content-type-options"].forEach(
+        (h) => {
+          const val = res.headers.get(h);
+          if (val) responseHeaders.set(h, val);
+        }
+      );
+
+      return new NextResponse(res.body, {
+        status: res.status,
+        headers: responseHeaders,
+      });
+    }
+
     const user = await requireAuth();
     const documentId = params.id;
 

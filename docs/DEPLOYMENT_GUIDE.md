@@ -45,18 +45,24 @@ NODE_ENV=production
 - PostgreSQL client libraries
 
 ### Installation & Execution
+
+#### Option A: Running from Repository Root (Recommended)
 ```bash
-# 1. Navigate to backend directory
-cd backend
+# 1. Install dependencies
+pip install -r backend/requirements.txt
 
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Health & Database connectivity check
+# 2. Database connectivity check
 python -c "from backend.app.core.database import SessionLocal; from sqlalchemy import text; db = SessionLocal(); print('Connected to DB:', db.execute(text('SELECT 1')).scalar()); db.close()"
 
-# 4. Start production server with Uvicorn (multi-worker)
+# 3. Start production server with Uvicorn (multi-worker)
 uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+#### Option B: Running from `backend/` Subdirectory
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ### Health Check Endpoint

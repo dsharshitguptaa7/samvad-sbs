@@ -6,6 +6,7 @@
 
 # testing
 /coverage
+.pytest_cache/
 
 # next.js
 /.next/
@@ -13,6 +14,18 @@
 
 # production
 /build
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+
+# Private uploads & storage
+.storage/
 
 # misc
 .DS_Store

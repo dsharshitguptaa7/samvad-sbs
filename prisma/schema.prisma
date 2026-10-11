@@ -48,6 +48,11 @@ enum GrievanceCategory {
   OTHER
 }
 
+enum WorkflowMode {
+  HOD_DIRECTOR
+  COORDINATOR_HOD_DIRECTOR
+}
+
 enum DocumentRequestStatus {
   PENDING
   FULFILLED
@@ -104,6 +109,9 @@ model User {
   requestedDocuments DocumentRequest[]         @relation("RequestedByStaff")
   sessions           Session[]
   adminAuditLogs     SystemAuditLog[]
+  passwordResetTokens PasswordResetToken[]
+  workflowConfigUpdates WorkflowConfiguration[] @relation("WorkflowConfigUpdater")
+  workflowAuditLogs     WorkflowAuditLog[]
 
   @@index([role, isActive])
   @@index([email])
@@ -120,6 +128,19 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique // SHA-256 digest of one-time raw token
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt, expiresAt])
 }
 
 // -------------------------------------------------------------
@@ -144,14 +165,16 @@ model Department {
 }
 
 model Course {
-  id           String   @id @default(uuid())
-  departmentId String
-  name         String   // e.g. "M.Sc. Mathematics"
-  code         String   // e.g. "MSCMATH"
-  programType  String?  // "Undergraduate", "Postgraduate", "PhD"
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  departmentId   String
+  name           String   // e.g. "M.Sc. Mathematics"
+  code           String   // e.g. "MSCMATH"
+  programType    String?  // "Undergraduate", "Postgraduate", "PhD"
+  totalSemesters Int      @default(6) // Total semester count (e.g. 6 for B.Sc., 4 for M.Sc.)
+  academicPeriod String?  @default("ALL") // Active academic period/session (e.g. "ODD", "EVEN", "ALL")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   department       Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   staffAssignments StaffAssignment[]
@@ -162,14 +185,16 @@ model Course {
 }
 
 model StaffAssignment {
-  id           String    @id @default(uuid())
-  userId       String
-  role         UserRole  // COURSE_COORDINATOR or HOD
-  departmentId String
-  courseId     String?   // Specific course for Coordinator; null for Department HoD
-  isActive     Boolean   @default(true)
-  assignedAt   DateTime  @default(now())
-  unassignedAt DateTime?
+  id             String    @id @default(uuid())
+  userId         String
+  role           UserRole  // COURSE_COORDINATOR or HOD
+  departmentId   String
+  courseId       String?   // Specific course for Coordinator; null for Department HoD
+  semesters      Int[]     @default([]) // Semesters covered by this assignment (e.g. [1, 2], [1, 3, 5], [] = all)
+  academicPeriod String?   // Applicable academic period (e.g. "ODD", "EVEN", "ALL")
+  isActive       Boolean   @default(true)
+  assignedAt     DateTime  @default(now())
+  unassignedAt   DateTime?
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
   department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
@@ -189,6 +214,7 @@ model Grievance {
   studentId          String
   departmentId       String
   courseId           String
+  semester           Int?              // Enrolled semester at time of grievance lodging (1..totalSemesters)
   assignedToUserId   String?           // Currently assigned review official
 
   category           GrievanceCategory
@@ -198,6 +224,8 @@ model Grievance {
 
   currentTier        GrievanceTier     @default(TIER_1_COORDINATOR)
   currentStatus      GrievanceStatus   @default(SUBMITTED)
+  workflowMode       WorkflowMode      @default(HOD_DIRECTOR)
+  workflowVersion    Int               @default(1)
 
   resolvedAt         DateTime?
   resolutionSummary  String?           @db.Text
@@ -219,6 +247,7 @@ model Grievance {
   @@index([studentId, currentStatus])
   @@index([departmentId, currentTier, currentStatus])
   @@index([courseId, currentTier, currentStatus])
+  @@index([courseId, semester, currentTier, currentStatus])
   @@index([createdAt])
 }
 
@@ -315,4 +344,44 @@ model SystemAuditLog {
   @@index([adminUserId])
   @@index([targetModel, targetId])
   @@index([createdAt])
+}
+
+// -------------------------------------------------------------
+// WORKFLOW CONFIGURATION & AUDIT
+// -------------------------------------------------------------
+
+model WorkflowConfiguration {
+  id              String       @id @default(uuid())
+  key             String       @unique @default("DEFAULT")
+  mode            WorkflowMode @default(HOD_DIRECTOR)
+  version         Int          @default(1)
+  updatedByUserId String?
+  changeReason    String?      @db.Text
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  updatedBy       User?              @relation("WorkflowConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  auditLogs       WorkflowAuditLog[]
+
+  @@index([key])
+}
+
+model WorkflowAuditLog {
+  id            String       @id @default(uuid())
+  configId      String
+  adminUserId   String
+  previousMode  WorkflowMode
+  newMode       WorkflowMode
+  reason        String       @db.Text
+  versionBefore Int
+  versionAfter  Int
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime     @default(now())
+
+  config    WorkflowConfiguration @relation(fields: [configId], references: [id], onDelete: Cascade)
+  adminUser User                  @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+
+  @@index([configId, createdAt])
+  @@index([adminUserId])
 }

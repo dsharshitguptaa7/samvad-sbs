@@ -1,27 +1,116 @@
 "use client";
 
 import React, { useState } from "react";
-import { NoticeBanner } from "@/components/NoticeBanner";
 import {
   Search,
   Clock,
   CheckCircle2,
   AlertCircle,
   FileText,
-  UserCheck,
   Building2,
-  Award,
-  ArrowRight,
-  ShieldAlert,
+  GraduationCap,
+  Layers,
+  ShieldCheck,
 } from "lucide-react";
 
-export default function TrackGrievancePage() {
-  const [token, setToken] = useState("CSJMU-SBS-2026-MATH-0142");
-  const [showDemoTimeline, setShowDemoTimeline] = useState(false);
+interface PublicMilestone {
+  actionType: string;
+  fromTier: string | null;
+  toTier: string | null;
+  fromStatus: string | null;
+  toStatus: string | null;
+  timestamp: string;
+}
 
-  const handleSearch = (e: React.FormEvent) => {
+interface PublicTrackingRecord {
+  trackingNumber: string;
+  category: string;
+  currentStatus: string;
+  currentTier: string;
+  submittedAt: string;
+  resolvedAt: string | null;
+  departmentName: string;
+  departmentCode: string;
+  courseName: string;
+  courseCode: string;
+  milestones: PublicMilestone[];
+}
+
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useCallback } from "react";
+
+function TrackGrievanceContent() {
+  const searchParams = useSearchParams();
+  const [tokenInput, setTokenInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [record, setRecord] = useState<PublicTrackingRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRecord = useCallback(async (token: string) => {
+    if (!token.trim()) return;
+    setError(null);
+    setRecord(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch(`/api/track?trackingNumber=${encodeURIComponent(token.trim())}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Grievance record not found.");
+      }
+
+      setRecord(data.trackingRecord);
+    } catch (err: any) {
+      setError(err.message || "Failed to search tracking record.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const param = searchParams.get("trackingNumber");
+    if (param) {
+      setTokenInput(param.toUpperCase());
+      fetchRecord(param.toUpperCase());
+    }
+  }, [searchParams, fetchRecord]);
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowDemoTimeline(true);
+    fetchRecord(tokenInput);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "SUBMITTED":
+        return "bg-blue-50 text-blue-700 border-blue-200";
+      case "UNDER_REVIEW":
+        return "bg-amber-50 text-amber-700 border-amber-200";
+      case "AWAITING_STUDENT_INFO":
+        return "bg-purple-50 text-purple-700 border-purple-200";
+      case "FORWARDED":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200";
+      case "RESOLVED":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "DISMISSED":
+        return "bg-rose-50 text-rose-700 border-rose-200";
+      default:
+        return "bg-slate-50 text-slate-700 border-slate-200";
+    }
+  };
+
+  const getTierLabel = (tier: string) => {
+    switch (tier) {
+      case "TIER_1_COORDINATOR":
+        return "Tier 1: Course Coordinator Review";
+      case "TIER_2_HOD":
+        return "Tier 2: Department Head Review";
+      case "TIER_3_DIRECTOR":
+        return "Tier 3: School Director Review";
+      default:
+        return tier.replace(/_/g, " ");
+    }
   };
 
   return (
@@ -35,23 +124,17 @@ export default function TrackGrievancePage() {
         <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
           Track Grievance Redressal Status
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Enter your unique tracking token to inspect real-time progress across review tiers without logging in.
+        <p className="mt-1 text-sm text-slate-600 leading-relaxed">
+          Enter your official tracking token to check real-time progress across review tiers.
+          For privacy protection, student identity and confidential files are strictly hidden on public lookups.
         </p>
       </div>
-
-      {/* Notice Banner */}
-      <NoticeBanner
-        title="Foundation Phase Notice: Non-Functional Search Backend"
-        message="Live database queries against the PostgreSQL grievance ledger will be linked in Phase 3 (Student Grievance Lodging & Timeline). The search below demonstrates the public milestone timeline component layout."
-        variant="warning"
-      />
 
       {/* Search Input Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
         <form onSubmit={handleSearch} className="space-y-4">
           <div>
-            <label htmlFor="trackingId" className="block text-xs font-semibold text-slate-700 mb-1.5">
+            <label htmlFor="trackingId" className="block text-xs font-bold text-slate-700 mb-1.5">
               Grievance Tracking Number <span className="text-rose-500">*</span>
             </label>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -61,134 +144,152 @@ export default function TrackGrievancePage() {
                   name="trackingId"
                   type="text"
                   required
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
                   placeholder="e.g. CSJMU-SBS-2026-MATH-0142"
-                  className="w-full px-4 py-3 text-sm font-mono rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+                  className="w-full px-4 py-3 text-sm font-mono uppercase rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
                 />
               </div>
 
               <button
                 type="submit"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-sm focus-visible:ring-csjmu-600 shrink-0"
+                disabled={loading}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-sm focus-visible:ring-csjmu-600 shrink-0 disabled:opacity-50"
               >
-                <Search className="w-4 h-4" aria-hidden="true" />
-                <span>Search Tracking Record</span>
+                {loading ? (
+                  <span>Querying Ledger...</span>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" aria-hidden="true" />
+                    <span>Search Tracking Record</span>
+                  </>
+                )}
               </button>
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Format: <span className="font-mono">CSJMU-SBS-YYYY-[DEPT_CODE]-[SEQ]</span>
+              Format: <span className="font-mono">CSJMU-SBS-[YEAR]-[DEPT]-[CODE]</span>
             </p>
           </div>
         </form>
       </div>
 
-      {/* Empty State vs Mock Timeline Demonstration */}
-      {!showDemoTimeline ? (
+      {/* Error State */}
+      {error && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-xs text-rose-800">
+          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600 mt-0.5" />
+          <div className="leading-relaxed font-medium">{error}</div>
+        </div>
+      )}
+
+      {/* Result Display */}
+      {record && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+          {/* Header Info */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">
+                  {record.trackingNumber}
+                </span>
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${getStatusBadge(
+                    record.currentStatus
+                  )}`}
+                >
+                  {record.currentStatus.replace(/_/g, " ")}
+                </span>
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mt-2">
+                {record.courseName} ({record.courseCode})
+              </h2>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {record.departmentName} &bull; Category: {record.category.replace(/_/g, " ")}
+              </div>
+            </div>
+
+            <div className="text-right sm:border-l sm:pl-4 sm:border-slate-200 text-xs text-slate-500">
+              <div>Lodged On:</div>
+              <div className="font-bold text-slate-800 mt-0.5">
+                {new Date(record.submittedAt).toLocaleDateString("en-IN", {
+                  dateStyle: "medium",
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Current Tier Notice */}
+          <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center gap-3">
+            <Layers className="w-5 h-5 text-csjmu-800 shrink-0" />
+            <div className="text-xs text-csjmu-900">
+              <span className="font-bold">Active Review Tier:</span> {getTierLabel(record.currentTier)}
+            </div>
+          </div>
+
+          {/* Public Milestone Timeline */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              Public Milestone Trail
+            </h3>
+            <div className="border-l-2 border-csjmu-200 ml-3 pl-4 space-y-5 text-xs">
+              {record.milestones.map((m, idx) => (
+                <div key={idx} className="relative">
+                  <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-csjmu-700 border-2 border-white ring-1 ring-csjmu-700" />
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="font-bold text-slate-900">
+                      {m.actionType.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {new Date(m.timestamp).toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {m.toTier && <span>Moved to {getTierLabel(m.toTier)} &bull; </span>}
+                    {m.toStatus && <span>Status: {m.toStatus.replace(/_/g, " ")}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Privacy Notice Footnote */}
+          <div className="pt-4 border-t border-slate-200 flex items-center gap-2 text-[11px] text-slate-400">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>
+              End-to-end institutional privacy: Complainant details and confidential file attachments are protected under CSJMU grievance policy.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State when no query has been run */}
+      {!record && !error && (
         <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-12 text-center space-y-3">
           <div className="w-12 h-12 mx-auto rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
             <FileText className="w-6 h-6" aria-hidden="true" />
           </div>
           <h3 className="text-sm font-bold text-slate-700">No Query Executed</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Click &quot;Search Tracking Record&quot; above to preview how public grievance milestones, tier escalations, and official public remarks will be rendered.
+            Enter your tracking token above to query the live grievance database.
           </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Layout Demo Alert */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-blue-700 shrink-0" aria-hidden="true" />
-            <span>
-              <strong>Sample Layout Preview:</strong> The timeline below illustrates the public audit display for a grievance in the School of Basic Sciences.
-            </span>
-          </div>
-
-          {/* Grievance Summary Header */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <span className="text-xs font-mono font-bold text-csjmu-800 bg-csjmu-50 px-2.5 py-1 rounded border border-csjmu-100">
-                  {token}
-                </span>
-                <h2 className="text-lg font-bold text-slate-900 mt-2">
-                  Clarification on M.Sc. Mathematics Lab Component Evaluation
-                </h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                  Under Review &bull; Tier 1
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-              <div>
-                <span className="text-slate-500 block">Department</span>
-                <span className="font-semibold text-slate-800">Mathematics</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Course</span>
-                <span className="font-semibold text-slate-800">M.Sc. Mathematics</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Category</span>
-                <span className="font-semibold text-slate-800">Examination & Evaluation</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Submitted On</span>
-                <span className="font-semibold text-slate-800">02 Oct 2026</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Chronological Public Milestone Timeline */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-csjmu-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gold-500" aria-hidden="true" />
-              Public Milestones & Redressal History
-            </h3>
-
-            <div className="relative pl-6 space-y-8 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-              {/* Event 1 */}
-              <div className="relative">
-                <div className="absolute -left-[29px] top-0.5 w-4 h-4 rounded-full bg-emerald-500 ring-4 ring-white" />
-                <div className="text-xs font-semibold text-slate-400">02 Oct 2026 &bull; 10:15 AM</div>
-                <h4 className="text-sm font-bold text-slate-900 mt-0.5">Grievance Submitted by Student</h4>
-                <p className="text-xs text-slate-600 mt-1">
-                  Lodged with 2 evidentiary attachments (Grade sheet, Assignment copy).
-                </p>
-              </div>
-
-              {/* Event 2 */}
-              <div className="relative">
-                <div className="absolute -left-[29px] top-0.5 w-4 h-4 rounded-full bg-csjmu-700 ring-4 ring-white" />
-                <div className="text-xs font-semibold text-slate-400">02 Oct 2026 &bull; 02:40 PM</div>
-                <h4 className="text-sm font-bold text-slate-900 mt-0.5">Assigned to Course Coordinator (Tier 1)</h4>
-                <p className="text-xs text-slate-600 mt-1">
-                  Assigned to Faculty Coordinator for M.Sc. Mathematics. Grievance marked as <em>Under Review</em>.
-                </p>
-              </div>
-
-              {/* Event 3: Document Request Notice */}
-              <div className="relative">
-                <div className="absolute -left-[29px] top-0.5 w-4 h-4 rounded-full bg-amber-500 ring-4 ring-white" />
-                <div className="text-xs font-semibold text-slate-400">03 Oct 2026 &bull; 11:20 AM</div>
-                <h4 className="text-sm font-bold text-slate-900 mt-0.5">Supplementary Document Requested</h4>
-                <div className="mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
-                  <strong>Official Request from Course Coordinator:</strong>
-                  <p>
-                    &ldquo;Please submit the signed lab attendance sheet from Week 6 for verification of attendance waiver.&rdquo;
-                  </p>
-                  <span className="inline-block mt-2 font-semibold text-[11px] text-amber-800">
-                    Action required: Student must log in to upload requested document.
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
+  );
+}
+
+export default function TrackGrievancePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-4xl mx-auto px-4 py-16 text-center text-slate-500 text-sm">
+          Loading Grievance Tracking Desk...
+        </div>
+      }
+    >
+      <TrackGrievanceContent />
+    </Suspense>
   );
 }

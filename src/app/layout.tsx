@@ -19,7 +19,12 @@ export const metadata: Metadata = {
     "Geography",
     "Environmental Sciences",
   ],
-  authors: [{ name: "School of Basic Sciences, CSJMU Kanpur" }],
+  authors: [
+    { name: "Harshit Gupta" },
+    { name: "Anshika Soni" },
+    { name: "School of Basic Sciences, CSJMU Kanpur" },
+  ],
+  creator: "Harshit Gupta and Anshika Soni (M.Sc Mathematics with AI and DS)",
 };
 
 export default function RootLayout({

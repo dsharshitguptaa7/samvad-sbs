@@ -74,6 +74,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 2.5 Verify active Department and Course in database
+    const dept = await prisma.department.findUnique({
+      where: { code: departmentCode.toUpperCase() },
+    });
+    if (!dept || !dept.isActive) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Selected department is not currently active.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const course = await prisma.course.findFirst({
+      where: {
+        departmentId: dept.id,
+        name: { equals: courseName, mode: "insensitive" },
+        isActive: true,
+      },
+    });
+    if (!course) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Selected course does not exist or is not active in this department.",
+        },
+        { status: 400 }
+      );
+    }
+
     // 3. Hash Password (bcryptjs, 12 rounds)
     const passwordHash = await hashPassword(password);
 
@@ -106,6 +137,21 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
+    // Gracefully handle Prisma unique constraint violation (P2002) in race conditions
+    if (error?.code === "P2002") {
+      const target = Array.isArray(error.meta?.target)
+        ? error.meta.target.join(", ")
+        : (typeof error.meta?.target === "string" ? error.meta.target : "email, roll number, or enrollment number");
+      return NextResponse.json(
+        {
+          success: false,
+          error: `An account with this ${target} already exists.`,
+          code: "DUPLICATE_RESOURCE",
+        },
+        { status: 409 }
+      );
+    }
+
     console.error("Student registration error:", error);
     return NextResponse.json(
       {

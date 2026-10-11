@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,36 +8,81 @@ import {
   Shield,
   GraduationCap,
   Mail,
-  Lock,
-  Phone,
   AlertCircle,
   CheckCircle2,
   Loader2,
 } from "lucide-react";
 
+interface PublicCourse {
+  id: string;
+  name: string;
+  code: string;
+  programType: string | null;
+}
+
+interface PublicDepartment {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  courses: PublicCourse[];
+}
+
 export default function StudentRegisterPage() {
   const router = useRouter();
-  const [selectedDept, setSelectedDept] = useState("MATH");
-  const [selectedCourse, setSelectedCourse] = useState("B.Sc. Mathematics");
+
+  // Master data fetched from API
+  const [departments, setDepartments] = useState<PublicDepartment[]>([]);
+  const [loadingDepts, setLoadingDepts] = useState(true);
+
+  // Form selection state
+  const [selectedDeptCode, setSelectedDeptCode] = useState<string>("");
+  const [selectedCourseName, setSelectedCourseName] = useState<string>("");
+
+  // Submission state
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const coursesByDept: Record<string, string[]> = {
-    MATH: ["B.Sc. Mathematics", "M.Sc. Mathematics", "Ph.D. Mathematics"],
-    PHYS: ["B.Sc. Physics", "M.Sc. Physics", "Ph.D. Physics"],
-    CHEM: ["B.Sc. Chemistry", "M.Sc. Chemistry", "Ph.D. Chemistry"],
-    GEOG: ["B.A. / B.Sc. Geography", "M.A. / M.Sc. Geography"],
-    ENVS: ["M.Sc. Environmental Science", "Ph.D. Environmental Science"],
-  };
+  // Fetch active departments & courses on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadAcademicData() {
+      try {
+        const res = await fetch("/api/departments");
+        const data = await res.json();
+        if (isMounted && data.success && Array.isArray(data.departments) && data.departments.length > 0) {
+          setDepartments(data.departments);
+          const firstDept = data.departments[0];
+          setSelectedDeptCode(firstDept.code);
+          if (firstDept.courses.length > 0) {
+            setSelectedCourseName(firstDept.courses[0].name);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load departments:", err);
+      } finally {
+        if (isMounted) setLoadingDepts(false);
+      }
+    }
+    loadAcademicData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleDeptChange = (deptCode: string) => {
-    setSelectedDept(deptCode);
-    const available = coursesByDept[deptCode];
-    if (available && available.length > 0) {
-      setSelectedCourse(available[0]);
+    setSelectedDeptCode(deptCode);
+    const dept = departments.find((d) => d.code === deptCode);
+    if (dept && dept.courses.length > 0) {
+      setSelectedCourseName(dept.courses[0].name);
+    } else {
+      setSelectedCourseName("");
     }
   };
+
+  const currentDepartment = departments.find((d) => d.code === selectedDeptCode);
+  const currentCourses = currentDepartment?.courses || [];
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -50,8 +95,8 @@ export default function StudentRegisterPage() {
       fullName: formData.get("fullName"),
       rollNumber: formData.get("rollNumber"),
       enrollmentNo: formData.get("enrollmentNo"),
-      departmentCode: selectedDept,
-      courseName: selectedCourse,
+      departmentCode: selectedDeptCode,
+      courseName: selectedCourseName,
       semester: formData.get("semester"),
       email: formData.get("email"),
       phoneNumber: formData.get("phoneNumber"),
@@ -61,6 +106,12 @@ export default function StudentRegisterPage() {
     const confirmPassword = formData.get("confirmPassword");
     if (payload.password !== confirmPassword) {
       setErrorMessage("Passwords do not match. Please re-enter.");
+      setLoading(false);
+      return;
+    }
+
+    if (!payload.departmentCode || !payload.courseName) {
+      setErrorMessage("Please select a valid department and course offering.");
       setLoading(false);
       return;
     }
@@ -211,36 +262,54 @@ export default function StudentRegisterPage() {
                 <label htmlFor="department" className="block text-xs font-semibold text-slate-700 mb-1">
                   School Department <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  id="department"
-                  value={selectedDept}
-                  onChange={(e) => handleDeptChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-                >
-                  <option value="MATH">Department of Mathematics</option>
-                  <option value="PHYS">Department of Physics</option>
-                  <option value="CHEM">Department of Chemistry</option>
-                  <option value="GEOG">Department of Geography</option>
-                  <option value="ENVS">Department of Environmental Sciences</option>
-                </select>
+                {loadingDepts ? (
+                  <div className="flex items-center gap-2 px-3.5 py-2.5 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg">
+                    <Loader2 className="w-4 h-4 animate-spin text-csjmu-800" />
+                    <span>Loading academic departments...</span>
+                  </div>
+                ) : (
+                  <select
+                    id="department"
+                    value={selectedDeptCode}
+                    onChange={(e) => handleDeptChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600 bg-white"
+                  >
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.code}>
+                        {d.name} ({d.code})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
                 <label htmlFor="course" className="block text-xs font-semibold text-slate-700 mb-1">
                   Enrolled Course / Program <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  id="course"
-                  value={selectedCourse}
-                  onChange={(e) => setSelectedCourse(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-                >
-                  {coursesByDept[selectedDept]?.map((crs) => (
-                    <option key={crs} value={crs}>
-                      {crs}
-                    </option>
-                  ))}
-                </select>
+                {loadingDepts ? (
+                  <div className="flex items-center gap-2 px-3.5 py-2.5 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg">
+                    <Loader2 className="w-4 h-4 animate-spin text-csjmu-800" />
+                    <span>Loading courses...</span>
+                  </div>
+                ) : currentCourses.length === 0 ? (
+                  <div className="px-3.5 py-2.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg">
+                    No active courses in this department
+                  </div>
+                ) : (
+                  <select
+                    id="course"
+                    value={selectedCourseName}
+                    onChange={(e) => setSelectedCourseName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600 bg-white"
+                  >
+                    {currentCourses.map((crs) => (
+                      <option key={crs.id} value={crs.name}>
+                        {crs.name} {crs.programType ? `(${crs.programType})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
           </div>
@@ -342,7 +411,7 @@ export default function StudentRegisterPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || loadingDepts || currentCourses.length === 0}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-md focus-visible:ring-csjmu-600 disabled:opacity-50 cursor-pointer"
             >
               {loading ? (

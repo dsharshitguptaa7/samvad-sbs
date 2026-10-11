@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Menu, X, Shield, User, LogIn, Search, LogOut } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Menu, X, Shield, User, LogIn, Search, LogOut, LayoutDashboard } from "lucide-react";
+import { getRoleDashboardPath } from "@/lib/auth/role-routing";
 
 interface CurrentUser {
   id: string;
@@ -13,13 +14,12 @@ interface CurrentUser {
 }
 
 export function Navbar() {
-  const router = useRouter();
+  const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
-  useEffect(() => {
-    // Check if session exists
-    fetch("/api/auth/me")
+  const syncUserSession = useCallback(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && data.success && data.user) {
@@ -31,31 +31,19 @@ export function Navbar() {
       .catch(() => setCurrentUser(null));
   }, []);
 
+  useEffect(() => {
+    syncUserSession();
+  }, [pathname, syncUserSession]);
+
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      setCurrentUser(null);
-      router.push("/login");
-      router.refresh();
     } catch {
-      router.push("/login");
-    }
-  };
-
-  const getDashboardHref = (role: string) => {
-    switch (role) {
-      case "STUDENT":
-        return "/student";
-      case "SYSTEM_ADMIN":
-        return "/admin";
-      case "COURSE_COORDINATOR":
-        return "/coordinator";
-      case "DEPARTMENT_HEAD":
-        return "/department-head";
-      case "DIRECTOR":
-        return "/director";
-      default:
-        return "/";
+      // Proceed to clear state regardless of network failure
+    } finally {
+      setCurrentUser(null);
+      // Clean document reload to ensure complete cookie dropping and state reset
+      window.location.href = "/login";
     }
   };
 
@@ -137,13 +125,29 @@ export function Navbar() {
                 <Search className="w-4 h-4 text-gold-400" aria-hidden="true" />
                 Track Grievance
               </Link>
+              <Link
+                href="/#credits-heading"
+                className="px-3 py-2 rounded-md text-sm font-medium text-slate-200 hover:text-white hover:bg-csjmu-800 transition focus-visible:ring-white"
+              >
+                Credits
+              </Link>
+
+              {currentUser && (
+                <Link
+                  href={getRoleDashboardPath(currentUser.role)}
+                  className="px-3 py-2 rounded-md text-sm font-medium text-gold-300 hover:text-gold-200 hover:bg-csjmu-800 transition flex items-center gap-1.5 focus-visible:ring-white"
+                >
+                  <LayoutDashboard className="w-4 h-4 text-gold-400" aria-hidden="true" />
+                  My Dashboard
+                </Link>
+              )}
 
               <div className="h-6 w-px bg-csjmu-700 mx-2" aria-hidden="true" />
 
               {currentUser ? (
                 <div className="flex items-center gap-3">
                   <Link
-                    href={getDashboardHref(currentUser.role)}
+                    href={getRoleDashboardPath(currentUser.role)}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-csjmu-800 border border-csjmu-700 text-xs font-semibold text-white hover:bg-csjmu-750"
                   >
                     <User className="w-3.5 h-3.5 text-gold-400" />
@@ -232,11 +236,27 @@ export function Navbar() {
             >
               Track Grievance
             </Link>
+            <Link
+              href="/#credits-heading"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block px-3 py-2.5 rounded-md text-base font-medium text-slate-200 hover:bg-csjmu-800"
+            >
+              Credits &amp; Authorship
+            </Link>
+            {currentUser && (
+              <Link
+                href={getRoleDashboardPath(currentUser.role)}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block px-3 py-2.5 rounded-md text-base font-medium text-gold-300 hover:bg-csjmu-800"
+              >
+                My Dashboard ({currentUser.role})
+              </Link>
+            )}
             <div className="pt-4 border-t border-csjmu-800 space-y-2">
               {currentUser ? (
                 <>
                   <Link
-                    href={getDashboardHref(currentUser.role)}
+                    href={getRoleDashboardPath(currentUser.role)}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="w-full text-center block px-4 py-2.5 rounded-md text-sm font-semibold text-white bg-csjmu-800"
                   >

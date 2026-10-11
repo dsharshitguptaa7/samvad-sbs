@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { loginSchema } from "@/lib/auth/validation";
-import { verifyPassword } from "@/lib/auth/password";
+import { verifyPassword, dummyVerifyPassword } from "@/lib/auth/password";
 import { createSession, sanitizeUser } from "@/lib/auth/session";
 import {
   checkRateLimit,
@@ -9,6 +9,7 @@ import {
   resetRateLimit,
 } from "@/lib/auth/rate-limit";
 import { UserRole } from "@prisma/client";
+import { resolvePostLoginRedirect } from "@/lib/auth/role-routing";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { identifier, password, portalType } = validationResult.data;
+    const { identifier, password, portalType, redirect: requestedRedirect } = validationResult.data;
 
     // 2. Brute-Force Rate Limiting Check
     // Identifier-based key (lowercased)
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
     // 4. Constant-Time Verification / Safe Failure
     // If user does not exist, run a dummy bcrypt comparison to thwart timing enumeration
     if (!user) {
+      await dummyVerifyPassword(password);
       recordFailedAttempt(rateLimitKey);
       return NextResponse.json(
         {
@@ -128,12 +130,19 @@ export async function POST(request: NextRequest) {
     // 9. Session Fixation Defense: Create completely fresh session token
     await createSession(user.id);
 
-    // 10. Return Sanitized User (Never exposes passwordHash or session token)
+    // 10. Centralized Server-Authoritative Destination Resolution
+    const redirectUrl = resolvePostLoginRedirect(
+      user.role,
+      requestedRedirect || request.nextUrl.searchParams.get("redirect")
+    );
+
+    // 11. Return Sanitized User (Never exposes passwordHash or session token)
     return NextResponse.json(
       {
         success: true,
         message: "Sign in successful.",
         user: sanitizeUser(user),
+        redirectUrl,
       },
       { status: 200 }
     );

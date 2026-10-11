@@ -32,6 +32,22 @@ export async function verifyPassword(
 }
 
 /**
+ * Pre-computed 12-round bcrypt hash used for dummy comparisons.
+ * Ensures consistent execution time (~70-100ms) for non-existent users,
+ * mitigating timing-based user enumeration attacks.
+ */
+export const DUMMY_BCRYPT_HASH =
+  "$2b$12$otHsc4cwxTRbdXfwTTpCIOoFf8CdsMeoG/uPCp0YGHF2bhfKruTXa";
+
+/**
+ * Execute a dummy bcrypt comparison in constant time to prevent
+ * username/rollNumber enumeration via response latency differences.
+ */
+export async function dummyVerifyPassword(candidate: string): Promise<boolean> {
+  return verifyPassword(candidate || "dummy", DUMMY_BCRYPT_HASH);
+}
+
+/**
  * Validate password complexity:
  * - At least 8 characters
  * - At least 1 uppercase letter

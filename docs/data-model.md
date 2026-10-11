@@ -1,5 +1,6 @@
 # SAMVAD Data Model & Database Specification
-**Neon PostgreSQL & Prisma ORM**
+**Neon PostgreSQL & Prisma ORM**  
+*Document Version: 2.0 (Master Production Specification)*  
 
 ---
 
@@ -7,21 +8,24 @@
 
 ```mermaid
 erDiagram
-    User ||--o{ StaffAssignment : "holds"
+    User ||--o{ Session : "authenticates via"
+    User ||--o{ StaffAssignment : "holds tenure"
     User ||--o{ Grievance : "submits (as student)"
-    User ||--o{ GrievanceTimelineAction : "performs"
+    User ||--o{ Grievance : "adjudicates (as assigned official)"
+    User ||--o{ GrievanceTimelineAction : "executes"
     User ||--o{ GrievanceDocument : "uploads"
     User ||--o{ DocumentRequest : "initiates"
+    User ||--o{ SystemAuditLog : "performs admin mutation"
 
     Department ||--o{ Course : "offers"
-    Department ||--o{ StaffAssignment : "associates"
+    Department ||--o{ StaffAssignment : "associates faculty"
     Department ||--o{ Grievance : "categorized under"
 
     Course ||--o{ StaffAssignment : "coordinates"
     Course ||--o{ Grievance : "pertains to"
 
-    Grievance ||--o{ GrievanceDocument : "contains"
-    Grievance ||--o{ DocumentRequest : "has"
+    Grievance ||--o{ GrievanceDocument : "attaches evidence"
+    Grievance ||--o{ DocumentRequest : "issues requests"
     Grievance ||--o{ GrievanceTimelineAction : "records history in"
 
     DocumentRequest ||--o{ GrievanceDocument : "fulfilled by"
@@ -29,29 +33,17 @@ erDiagram
 
 ---
 
-## 2. Prisma Schema Definition (`prisma/schema.prisma`)
+## 2. Enums Specification
+
+All enums are defined as native PostgreSQL custom types via Prisma:
 
 ```prisma
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-// -------------------------------------------------------------
-// ENUMS
-// -------------------------------------------------------------
-
 enum UserRole {
   STUDENT
   COURSE_COORDINATOR
-  HOD
+  DEPARTMENT_HEAD
   DIRECTOR
-  ADMIN
+  SYSTEM_ADMIN
 }
 
 enum GrievanceTier {
@@ -106,44 +98,54 @@ enum DocumentPurpose {
   REQUESTED_SUPPLEMENT
   RESOLUTION_PROOF
 }
+```
 
-// -------------------------------------------------------------
-// USER & AUTHENTICATION
-// -------------------------------------------------------------
+---
 
+## 3. Relational Models Specification
+
+### 3.1 User & Authentication
+
+#### Model: `User`
+Stores all portal identities. Role privileges are strictly bounded by `role`.
+```prisma
 model User {
-  id              String         @id @default(uuid())
-  email           String         @unique
-  passwordHash    String
-  fullName        String
-  role            UserRole       @default(STUDENT)
-  phoneNumber     String?
-  rollNumber      String?        @unique // Applicable for Students
-  enrollmentNo    String?        @unique // Applicable for Students
-  isActive        Boolean        @default(true)
-  mustResetPassword Boolean      @default(false)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String
+  fullName          String
+  role              UserRole  @default(STUDENT)
+  phoneNumber       String?
+  rollNumber        String?   @unique // Unique roll number for Students
+  enrollmentNo      String?   @unique // Unique enrollment number for Students
+  isActive          Boolean   @default(true) // Account status
+  mustResetPassword Boolean   @default(false) // Forced reset on initial staff login
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  // Relations
-  studentGrievances       Grievance[]             @relation("StudentGrievances")
-  assignedGrievances      Grievance[]             @relation("AssignedOfficial")
-  staffAssignments        StaffAssignment[]
-  timelineActions         GrievanceTimelineAction[]
-  uploadedDocuments       GrievanceDocument[]
-  requestedDocuments      DocumentRequest[]       @relation("RequestedByStaff")
-  sessions                Session[]
-  adminAuditLogs          SystemAuditLog[]
+  // Relationships
+  studentGrievances  Grievance[]               @relation("StudentGrievances")
+  assignedGrievances Grievance[]               @relation("AssignedOfficial")
+  staffAssignments   StaffAssignment[]
+  timelineActions    GrievanceTimelineAction[]
+  uploadedDocuments  GrievanceDocument[]
+  requestedDocuments DocumentRequest[]         @relation("RequestedByStaff")
+  sessions           Session[]
+  adminAuditLogs     SystemAuditLog[]
 
   @@index([role, isActive])
   @@index([email])
   @@index([rollNumber])
 }
+```
 
+#### Model: `Session`
+Stores active session tokens hashed with SHA-256 at rest.
+```prisma
 model Session {
   id        String   @id @default(uuid())
   userId    String
-  token     String   @unique
+  token     String   @unique // SHA-256 digest of 256-bit random hex
   expiresAt DateTime
   createdAt DateTime @default(now())
 
@@ -151,38 +153,64 @@ model Session {
 
   @@index([userId])
 }
+```
 
-// -------------------------------------------------------------
-// ACADEMIC MASTER DATA
-// -------------------------------------------------------------
+#### Model: `PasswordResetToken`
+Stores single-use administrative setup and password reset tokens hashed with SHA-256 at rest.
+```prisma
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique // SHA-256 digest of 64-hex-character entropy string
+  expiresAt DateTime
+  usedAt    DateTime? // Set atomically when password is configured; prevents token reuse
+  createdAt DateTime  @default(now())
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt, expiresAt])
+}
+```
+
+---
+
+### 3.2 Academic Master Data & Authority Mapping
+
+#### Model: `Department`
+Represents academic basic science departments (Mathematics, Physics, Chemistry, Geography, Environmental Sciences).
+```prisma
 model Department {
   id          String   @id @default(uuid())
-  name        String   @unique // e.g., "Department of Mathematics"
-  code        String   @unique // e.g., "MATH"
+  name        String   @unique // e.g. "Department of Mathematics"
+  code        String   @unique // e.g. "MATH"
   description String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean  @default(true) // Soft active toggle
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
+  // Relationships
   courses          Course[]
   staffAssignments StaffAssignment[]
   grievances       Grievance[]
 
   @@index([isActive])
 }
+```
 
+#### Model: `Course`
+Represents programs and academic courses under departments (e.g. M.Sc. Mathematics).
+```prisma
 model Course {
-  id           String     @id @default(uuid())
+  id           String   @id @default(uuid())
   departmentId String
-  name         String     // e.g., "M.Sc. Mathematics"
-  code         String     // e.g., "MSCMATH"
-  programType  String?    // "Undergraduate", "Postgraduate", "PhD"
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  name         String   // e.g. "M.Sc. Mathematics"
+  code         String   // e.g. "MSCMATH"
+  programType  String?  // Undergraduate, Postgraduate, Doctoral
+  isActive     Boolean  @default(true) // Soft active toggle
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
+  // Relationships
   department       Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   staffAssignments StaffAssignment[]
   grievances       Grievance[]
@@ -190,17 +218,22 @@ model Course {
   @@unique([departmentId, code])
   @@index([departmentId, isActive])
 }
+```
 
+#### Model: `StaffAssignment`
+Links faculty accounts to departments and courses. This model is the source of truth for authority routing.
+```prisma
 model StaffAssignment {
-  id           String     @id @default(uuid())
+  id           String    @id @default(uuid())
   userId       String
-  role         UserRole   // COURSE_COORDINATOR or HOD
+  role         UserRole  // COURSE_COORDINATOR or DEPARTMENT_HEAD
   departmentId String
-  courseId     String?    // Specific course for Coordinator; null for HoD
-  isActive     Boolean    @default(true)
-  assignedAt   DateTime   @default(now())
+  courseId     String?   // Specified for Coordinators, null for HoDs
+  isActive     Boolean   @default(true)
+  assignedAt   DateTime  @default(now())
   unassignedAt DateTime?
 
+  // Relationships
   user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
   department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   course     Course?    @relation(fields: [courseId], references: [id], onDelete: Restrict)
@@ -208,39 +241,38 @@ model StaffAssignment {
   @@index([userId, isActive])
   @@index([departmentId, courseId, isActive])
 }
+```
 
-// -------------------------------------------------------------
-// GRIEVANCE CORE
-// -------------------------------------------------------------
+---
 
+### 3.3 Grievance & Document Pipeline
+
+#### Model: `Grievance`
+Core grievance submission and tracking ledger.
+```prisma
 model Grievance {
-  id               String            @id @default(uuid())
-  trackingNumber   String            @unique // e.g. "CSJMU-SBS-2026-MATH-0142"
-  studentId        String
-  departmentId     String
-  courseId         String
-  assignedToUserId String?           // Currently assigned handling official
-  
-  category         GrievanceCategory
-  subject          String            @db.VarChar(150)
-  description      String            @db.Text
-  reliefSought     String?           @db.VarChar(500)
-  
-  currentTier      GrievanceTier     @default(TIER_1_COORDINATOR)
-  currentStatus    GrievanceStatus   @default(SUBMITTED)
-  
-  resolvedAt       DateTime?
-  resolutionSummary String?          @db.Text
-  
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                String            @id @default(uuid())
+  trackingNumber    String            @unique // e.g. "CSJMU-SBS-2026-MATH-0142"
+  studentId         String
+  departmentId      String
+  courseId          String
+  assignedToUserId  String?           // Currently responsible official
+  category          GrievanceCategory
+  subject           String            @db.VarChar(150)
+  description       String            @db.Text
+  reliefSought      String?           @db.VarChar(500)
+  currentTier       GrievanceTier     @default(TIER_1_COORDINATOR)
+  currentStatus     GrievanceStatus   @default(SUBMITTED)
+  resolvedAt        DateTime?
+  resolutionSummary String?           @db.Text
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  // Relations
+  // Relationships
   student          User                      @relation("StudentGrievances", fields: [studentId], references: [id], onDelete: Restrict)
-  assignedTo       User?                     @relation("AssignedOfficial", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  assignedOfficial User?                     @relation("AssignedOfficial", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   department       Department                @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   course           Course                    @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  
   documents        GrievanceDocument[]
   documentRequests DocumentRequest[]
   timelineActions  GrievanceTimelineAction[]
@@ -251,26 +283,25 @@ model Grievance {
   @@index([courseId, currentTier, currentStatus])
   @@index([createdAt])
 }
+```
 
-// -------------------------------------------------------------
-// DOCUMENTS & EVIDENCE
-// -------------------------------------------------------------
-
+#### Model: `GrievanceDocument`
+Evidentiary files uploaded by students or staff.
+```prisma
 model GrievanceDocument {
-  id                String          @id @default(uuid())
-  grievanceId       String
-  uploadedById      String
-  requestId         String?         // Set if uploaded in response to a DocumentRequest
-  
-  fileName          String          // Original sanitized filename
-  storageKey        String          @unique // UUID-based object storage path
-  fileSize          Int             // In bytes (max 5242880 = 5MB)
-  mimeType          String          // Verified MIME type (application/pdf, image/jpeg, etc.)
-  sha256Hash        String?         // Integrity verification hash
-  purpose           DocumentPurpose @default(INITIAL_SUPPORT)
-  
-  createdAt         DateTime        @default(now())
+  id           String          @id @default(uuid())
+  grievanceId  String
+  uploadedById String
+  requestId    String?         // Set if uploaded in fulfillment of DocumentRequest
+  fileName     String
+  storageKey   String          @unique // Private storage path / S3 key
+  fileSize     Int             // File size in bytes (max 5242880 = 5MB)
+  mimeType     String          // application/pdf, image/jpeg, image/png
+  sha256Hash   String?         // SHA-256 cryptographic checksum
+  purpose      DocumentPurpose @default(INITIAL_SUPPORT)
+  createdAt    DateTime        @default(now())
 
+  // Relationships
   grievance       Grievance        @relation(fields: [grievanceId], references: [id], onDelete: Restrict)
   uploadedBy      User             @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
   documentRequest DocumentRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
@@ -278,68 +309,78 @@ model GrievanceDocument {
   @@index([grievanceId])
   @@index([uploadedById])
 }
+```
 
+#### Model: `DocumentRequest`
+Formal supplementary document requests initiated by officials.
+```prisma
 model DocumentRequest {
-  id                  String                @id @default(uuid())
-  grievanceId         String
-  requestedById       String
-  requestedTier       GrievanceTier
-  
-  instructions        String                @db.Text // Clear instructions on what proof is required
-  deadline            DateTime?
-  status              DocumentRequestStatus @default(PENDING)
-  
-  fulfilledAt         DateTime?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  id            String                @id @default(uuid())
+  grievanceId   String
+  requestedById String
+  requestedTier GrievanceTier
+  instructions  String                @db.Text
+  deadline      DateTime?
+  status        DocumentRequestStatus @default(PENDING)
+  fulfilledAt   DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
+  // Relationships
   grievance   Grievance           @relation(fields: [grievanceId], references: [id], onDelete: Restrict)
   requestedBy User                @relation("RequestedByStaff", fields: [requestedById], references: [id], onDelete: Restrict)
   documents   GrievanceDocument[]
 
   @@index([grievanceId, status])
 }
+```
 
-// -------------------------------------------------------------
-// AUDIT LOGGING & TIMELINE (IMMUTABLE)
-// -------------------------------------------------------------
+---
 
+### 3.4 Audit Trail & History
+
+#### Model: `GrievanceTimelineAction`
+Tamper-evident, append-only chronological log of all grievance lifecycle events.
+```prisma
 model GrievanceTimelineAction {
-  id           String             @id @default(uuid())
-  grievanceId  String
-  actorId      String
-  actorRole    UserRole
-  
-  actionType   TimelineActionType
-  fromTier     GrievanceTier?
-  toTier       GrievanceTier?
-  fromStatus   GrievanceStatus?
-  toStatus     GrievanceStatus?
-  
-  remarks      String?            @db.Text
-  visibility   TimelineVisibility @default(PUBLIC_TO_STUDENT)
-  ipAddress    String?
-  userAgent    String?
-  
-  createdAt    DateTime           @default(now())
+  id          String             @id @default(uuid())
+  grievanceId String
+  actorId     String
+  actorRole   UserRole
+  actionType  TimelineActionType
+  fromTier    GrievanceTier?
+  toTier      GrievanceTier?
+  fromStatus  GrievanceStatus?
+  toStatus    GrievanceStatus?
+  remarks     String?            @db.Text
+  visibility  TimelineVisibility @default(PUBLIC_TO_STUDENT)
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime           @default(now())
 
+  // Relationships
   grievance Grievance @relation(fields: [grievanceId], references: [id], onDelete: Restrict)
   actor     User      @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([grievanceId, visibility, createdAt])
   @@index([actorId])
 }
+```
 
+#### Model: `SystemAuditLog`
+Administrative audit trail for user provisioning, role assignments, department modifications, and security actions.
+```prisma
 model SystemAuditLog {
   id          String   @id @default(uuid())
   adminUserId String
-  action      String   // e.g. "USER_CREATED", "STAFF_ASSIGNED", "PASSWORD_RESET"
-  targetModel String   // e.g. "User", "Department", "Course"
+  action      String   // e.g. "DEPARTMENT_CREATED", "STAFF_PROVISIONED"
+  targetModel String   // "Department", "Course", "User", "StaffAssignment"
   targetId    String
-  details     Json?    // Structured payload of previous/new state
+  details     Json?    // Snapshot of previous vs new state
   ipAddress   String?
   createdAt   DateTime @default(now())
 
+  // Relationships
   adminUser User @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
 
   @@index([adminUserId])
@@ -350,13 +391,13 @@ model SystemAuditLog {
 
 ---
 
-## 3. Data Integrity & Constraints
+## 4. Referential Integrity & Non-Destructive Invariants
 
-1. **Deletion Policies**:
-   - Master data (Departments, Courses, Staff, Complaints) have `onDelete: Restrict`. Historical records cannot be accidentally or maliciously deleted if associated with grievances or timeline entries.
-2. **Deterministic Tracking Numbers**:
-   - Tracking numbers are enforced unique in PostgreSQL via unique index (`CSJMU-SBS-YYYY-[DEPT]-[SEQ]`).
-3. **Atomic State Updates**:
-   - All state transitions create an entry in `GrievanceTimelineAction` in the same database transaction (`$transaction`).
-4. **Optimistic Concurrency**:
-   - The `updatedAt` field on `Grievance` prevents concurrent modifications from conflicting staff reviews.
+1. **Cascade Delete Isolation**:
+   - `ON DELETE CASCADE` is permitted strictly on `Session.userId` to clean up session tokens when a user is deleted.
+   - All operational models (`Grievance`, `GrievanceDocument`, `GrievanceTimelineAction`, `StaffAssignment`, `Department`, `Course`) use `ON DELETE RESTRICT`. A department, course, or user with existing grievances cannot be hard-deleted.
+2. **Soft Deactivation Pattern**:
+   - Departments and courses feature `isActive: Boolean`. When deactivated, existing grievances continue to display historical department/course metadata, but new grievances cannot select deactivated units.
+   - Staff accounts feature `isActive: Boolean`. When deactivated, their past timeline actions remain intact with full attribution.
+3. **Historical Attribution**:
+   - `GrievanceTimelineAction` records snapshot values (`actorRole`, `fromTier`, `toTier`, `fromStatus`, `toStatus`) at the exact moment of execution, guaranteeing audit integrity even if the actor changes roles in the future.

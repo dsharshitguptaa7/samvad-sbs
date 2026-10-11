@@ -1,258 +1,293 @@
 # SAMVAD System Architecture & Technical Design
-**School of Basic Sciences, CSJMU Kanpur**
+**School of Basic Sciences, CSJMU Kanpur**  
+*Document Version: 2.0 (Master Production Architecture)*  
 
 ---
 
 ## 1. System Overview & Technology Stack
 
-SAMVAD is architected as a high-integrity, serverless-ready web application using the modern TypeScript ecosystem. It leverages React Server Components (RSC) for rapid first-contentful paint and data confidentiality, paired with Next.js Server Actions for secure, mutation-driven workflows.
+SAMVAD is architected as a high-integrity, production-conscious web application designed for enterprise deployment in a university environment. It pairs React Server Components (RSC) for zero-client-bundle data fetching with Next.js Server Actions and Route Handlers for server-authenticated mutations.
 
 ```
-                      ┌─────────────────────────────────────────┐
-                      │            Browser Client               │
-                      │  (Student, Faculty, Admin Interfaces)   │
-                      └────────────────────┬────────────────────┘
-                                           │ HTTPS / TLS 1.3
-                                           ▼
-                      ┌─────────────────────────────────────────┐
-                      │          Next.js App Router             │
-                      │    (Edge Middleware & Route Handlers)   │
-                      └─────────────┬─────────────┬─────────────┘
-                                    │             │
-                ┌───────────────────┘             └───────────────────┐
-                ▼                                                     ▼
-┌───────────────────────────────┐                     ┌───────────────────────────────┐
-│     Server Components &       │                     │    Private Document Storage   │
-│       Server Actions          │                     │    (S3-Compatible / R2 / Blob)│
-│  - Input Validation (Zod)     │                     │  - Strict Pre-signed URLs     │
-│  - RBAC & ABAC Enforcement    │                     │  - Authenticated Stream Proxy │
-│  - Audit Log Orchestrator     │                     └───────────────────────────────┘
-└───────────────┬───────────────┘
-                │ Prisma ORM (Prepared Statements)
-                ▼
-┌───────────────────────────────┐
-│   Neon PostgreSQL (Cloud)     │
-│  - pgBouncer Pooling          │
-│  - Normalized Schema          │
-│  - Foreign Key Constraints    │
-└───────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                            Browser Client                              │
+│              (Student, Faculty Staff, Admin Interfaces)                │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ HTTPS (TLS 1.3 / Strict Cookies)
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Next.js App Router (14.2)                       │
+│    - Edge Middleware: Cookie presence gate & routing defense           │
+│    - React Server Components: Server-rendered read pages               │
+│    - Server Actions & Route Handlers: Authenticated business mutations│
+└───────────────────┬────────────────────────────────┬───────────────────┘
+                    │                                │
+                    ▼                                ▼
+┌──────────────────────────────────────┐ ┌───────────────────────────────┐
+│       Domain Services & Guards       │ │    Private Document Storage   │
+│ - Session & Auth Engine (Bcrypt/SHA) │ │ - Local / Cloud Storage       │
+│ - RBAC & ABAC Tenancy Scoping        │ │ - Magic-byte MIME Validation  │
+│ - Dynamic Routing Engine             │ │ - SHA-256 Content Hash        │
+│ - Append-only Timeline Logger        │ │ - Authenticated Stream Proxy  │
+└───────────────────┬──────────────────┘ └───────────────────────────────┘
+                    │ Prepared Statements
+                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                  Neon Serverless PostgreSQL (18.6)                     │
+│  - Runtime Pooler: DATABASE_URL (pgBouncer transaction mode)           │
+│  - Migration Direct: DIRECT_URL (Direct session mode for DDL)          │
+│  - Relational Schema with Foreign Key Constraints & Custom Enums       │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Technology Stack Specifications
 
-| Layer | Technology | Justification |
-| :--- | :--- | :--- |
-| **Framework** | Next.js (App Router, React 19 / Server Components) | Built-in streaming, zero-bundle overhead for data-fetching pages, type-safe Server Actions. |
-| **Language** | TypeScript (Strict Mode) | End-to-end type safety from database schemas to UI forms. |
-| **Styling & UI** | Tailwind CSS + Radix UI (shadcn/ui design primitives) | High accessibility compliance (WCAG 2.1 AA out-of-the-box), lightweight, zero runtime CSS. |
-| **Database** | Neon Serverless PostgreSQL | ACID compliance, scale-to-zero efficiency, instant branching for staging/test environments, built-in connection pooling. |
-| **ORM** | Prisma ORM | Strong schema-driven typing, declarative migrations, automated query parameterization. |
-| **Validation** | Zod | Dual-layer validation (client form feedback and mandatory server boundary verification). |
-| **Authentication** | Session-based / Iron-Session or Auth.js (Credentials Provider) | Secure, HTTP-only, `SameSite=Strict`, encrypted cookie sessions without client-side token exposure. |
-| **Icons** | Lucide React | Clean, accessible iconography with aria-hidden defaults. |
+| Component | Technology | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Framework** | Next.js (App Router) | `14.2.15` | Server-side rendering, streaming, server actions, route handlers. |
+| **Runtime Language** | TypeScript | `5.6.3` | Strict type safety across database schemas, forms, and APIs. |
+| **UI & Styling** | Tailwind CSS + PostCSS | `3.4.14` | Navy & gold university palette, accessible WCAG 2.1 AA tokens. |
+| **Database** | Neon Serverless PostgreSQL | `PostgreSQL 18.6` | ACID compliance, cloud branching, scale-to-zero compute. |
+| **ORM & Migrations** | Prisma ORM | `5.22.0` | Schema-driven typing, declarative migrations, parameterization. |
+| **Password Security**| `bcryptjs` | `3.0.3` | Constant-time bcrypt hashing (12 rounds) with timing equalization. |
+| **Session Security** | Node `crypto` + HTTP Cookies | Native | 256-bit cryptographically secure tokens, SHA-256 DB storage. |
+| **Input Validation** | Zod | `4.6.5` | Strict runtime boundary validation for all forms and API payloads. |
+| **Iconography** | `lucide-react` | `0.453.0` | Accessible SVGs with `aria-hidden` attributes. |
 
 ---
 
 ## 2. Layered Clean Architecture
 
-To enforce clean separation of concerns and deterministic execution, SAMVAD adheres to a strict 4-tier layer pattern:
+To enforce separation of concerns, the application follows a 4-tier architectural pattern:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. Presentation Layer (App Router Pages, Modals, Forms)     │
-│    - React Server Components (Read-only data rendering)     │
-│    - Client Components (Interactive tabs, file upload UI)   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Calls Server Actions
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 2. Application Layer (Server Actions & Route Handlers)      │
-│    - Authenticate session context                           │
-│    - Validate schema via Zod                                │
-│    - Enforce permissions (RBAC / ABAC)                      │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Dispatches to
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 3. Domain Service Layer (Business Logic & Workflow Engine)  │
-│    - State machine validation (Valid tier transitions)      │
-│    - Timeline action generation                             │
-│    - File hash & metadata verification                      │
-│    - Notification dispatcher                                │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Uses
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 4. Data Access Layer (Prisma ORM & PostgreSQL)              │
-│    - Atomic `$transaction` blocks                          │
-│    - Append-only audit logging                              │
-│    - Scoped departmental queries                            │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ 1. Presentation Layer (src/app/*, src/components/*)                    │
+│    - Server Components: Directly read from DB using getSessionUser()   │
+│    - Client Components: Interactive modals, form handlers, file inputs │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Form Submissions / Server Actions
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 2. Application & Guard Layer (src/lib/auth/guard.ts)                   │
+│    - requireAuth(): Checks active session and account status           │
+│    - requireRole(): Enforces RBAC permissions                          │
+│    - Tenancy Check: Enforces ABAC course/department assignment bounds  │
+│    - Zod Validation: Validates incoming payloads                       │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Calls Domain Services
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 3. Domain Logic & Workflow Engine                                      │
+│    - Dynamic Routing: Resolves assigned official via StaffAssignment   │
+│    - Workflow Transitions: Validates permitted status/tier changes     │
+│    - Timeline Logger: Creates append-only GrievanceTimelineAction rows │
+│    - Document Processor: Validates magic-bytes & generates hash        │
+│    - Audit Logger: Records admin mutations to SystemAuditLog           │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Atomic Operations
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 4. Data Access Layer (src/lib/prisma.ts)                               │
+│    - Prisma Client singleton connection pool                           │
+│    - Multi-table atomic transactions via prisma.$transaction           │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Security Architecture
+## 3. Database & Connection Architecture
 
-### 3.1 Authentication & Session Management
-- **Password Security**: Strong hashing with Argon2id or bcrypt ($12$ rounds minimum). Passwords are never logged or returned in queries.
-- **Session Tokens**: Cryptographically random 256-bit entropy tokens stored in PostgreSQL sessions table or encrypted HTTP-only session cookies with flags:
-  - `HttpOnly = true` (Prevents XSS extraction).
-  - `Secure = true` (HTTPS only).
-  - `SameSite = Strict` (Prevents CSRF attacks).
-  - `Max-Age = 28800` (8 hours active expiration).
+### 3.1 Two-Tier Connection Strategy
+Neon PostgreSQL requires two distinct connection strings for robust operation:
+1. **`DATABASE_URL` (Runtime Pooled):**
+   - Connects to Neon's pgBouncer pooler (`-pooler` endpoint, e.g., `ep-...-pooler.ap-southeast-1.aws.neon.tech`).
+   - Uses transaction pooling mode to support hundreds of concurrent serverless requests without exhausting PostgreSQL connection limits.
+   - Instantiated in `src/lib/prisma.ts`.
+2. **`DIRECT_URL` (Migration Direct):**
+   - Connects directly to the PostgreSQL compute instance, bypassing pgBouncer.
+   - Required by Prisma CLI (`prisma migrate deploy`, `prisma migrate status`) to acquire advisory locks and execute session-level DDL commands.
+   - Configured in `prisma/schema.prisma` via `directUrl = env("DIRECT_URL")`.
 
-### 3.2 Access Control (RBAC & ABAC)
-Access control is implemented in two tiers:
-1. **Role-Based Access Control (RBAC)**: Validates if the user has the overarching role required (e.g., `COURSE_COORDINATOR`).
-2. **Attribute-Based Access Control (ABAC)**: Enforces departmental and course tenancy:
-   ```typescript
-   // Conceptual tenancy guard
-   if (actor.role === 'COURSE_COORDINATOR') {
-     const isAssigned = await prisma.staffAssignment.findFirst({
-       where: {
-         userId: actor.id,
-         courseId: complaint.courseId,
-         isActive: true,
-       }
-     });
-     if (!isAssigned) throw new ForbiddenError("Not authorized for this course.");
-   }
-   ```
-
-### 3.3 Protection Against Common Web Vulnerabilities
-- **SQL Injection**: Prevented inherently via Prisma ORM parameterized queries.
-- **Cross-Site Scripting (XSS)**: Handled by React's native JSX escaping and DOMPurify for any sanitized rich-text fields.
-- **Cross-Site Request Forgery (CSRF)**: Server Actions validate origin headers and utilize `SameSite=Strict` session cookies.
-- **Rate Limiting**: In-memory token bucket or Upstash Redis rate limiter on authentication attempts (5 attempts per 15 minutes per IP).
+### 3.2 Secret Protection & Environment Segregation
+- `.env.local` and `.env` are strictly excluded from version control via `.gitignore`.
+- `.env.example` provides template placeholders only (`YOUR_NEON_PASSWORD`).
+- Zero database credentials or connection secrets are exposed to client-side bundles or `NEXT_PUBLIC_*` variables.
+- `scripts/db-health.ts` masks database passwords in console logs.
 
 ---
 
-## 4. File Security & Document Storage Pipeline
+## 4. Authentication, Session & Access Control Architecture
 
-Supporting documents (transcripts, medical certificates, grade cards, payment receipts) contain sensitive personal data and must be protected with enterprise-grade isolation.
-
-### 4.1 Storage Strategy
-- Files are **never stored in the public web root** or public S3 buckets.
-- Files reside in a private object store (e.g., S3/Cloudflare R2) or an isolated local secure storage volume inaccessible to direct HTTP requests.
-
-### 4.2 Upload Pipeline
-1. **Pre-Upload Validation (Client)**: Check file size ($\le 5\text{MB}$) and client MIME type.
-2. **Server Action Ticket Generation**:
-   - The user requests an upload ticket.
-   - The server validates user permission on the target complaint.
-   - Files are named using UUIDv4 keys (e.g., `docs/2026/03/<uuidv4>.pdf`) to eliminate directory traversal risks and sanitize filenames.
-3. **Magic Byte Inspection**:
-   - The server inspects the first 512 bytes (magic numbers) of uploaded files to ensure true MIME type (e.g., `%PDF-` for PDFs, `\xFF\xD8\xFF` for JPEG, `\x89PNG` for PNG).
-   - Executable formats (`.exe`, `.sh`, `.bat`, `.js`, `.html`, `.svg` with scripts) are rejected unconditionally.
-
-### 4.3 Secure File Access / Download
-- Direct object storage URLs are hidden.
-- Files are accessed via:
-  - **Authenticated Proxy Route**: `/api/complaints/[id]/documents/[docId]/download`
-  - The route validates that the requester is either the complaint owner (Student), the assigned Coordinator, the Department HoD, the Director, or an Admin.
-  - Returns file stream with HTTP headers:
-    - `Content-Disposition: attachment; filename="sanitized_original_name.pdf"`
-    - `Content-Type: application/pdf`
-    - `X-Content-Type-Options: nosniff`
-    - `Cache-Control: private, no-cache, no-store, must-revalidate`
-
----
-
-## 5. Complaint State Machine & Lifecycle
-
-The grievance follows a deterministic finite state machine (FSM). Invalid transitions are rejected at the domain service level.
-
+### 4.1 Cryptographic Session Model
 ```
-                  ┌───────────────┐
-                  │   SUBMITTED   │
-                  └───────┬───────┘
-                          │ Coordinator picks up
-                          ▼
-                  ┌───────────────┐
-       ┌─────────►│ UNDER_REVIEW  │◄─────────┐
-       │          └───────┬───────┘          │
-       │                  │                  │
-Student provides          │ Request docs     │ HoD / Director picks up
-clarification             ▼                  │
-       │       ┌──────────────────────┐      │
-       └───────┤AWAITING_STUDENT_INFO │      │
-               └──────────────────────┘      │
-                          │                  │
-                          ├──────────────────┘
-                          │ Forward (CC -> HoD or HoD -> Director)
-                          ▼
-                  ┌───────────────┐
-                  │   FORWARDED   │
-                  └───────┬───────┘
-                          │ Resolve
-                          ▼
-                  ┌───────────────┐
-                  │   RESOLVED    │
-                  └───────────────┘
+Client Browser                             Next.js Server                       Neon Database
+      │                                          │                                    │
+      │── 1. POST /api/auth/login ──────────────►│                                    │
+      │   (identifier + password)                │── 2. Query User by email/roll ────►│
+      │                                          │◄─ 3. Return user record ───────────│
+      │                                          │                                    │
+      │                                          │── 4. Bcrypt 12-round verify        │
+      │                                          │                                    │
+      │                                          │── 5. Generate raw token (256-bit)  │
+      │                                          │      Compute SHA-256 hash          │
+      │                                          │                                    │
+      │                                          │── 6. Store SHA-256 hash in DB ────►│
+      │                                          │                                    │
+      │◄─ 7. Set HTTP-only Cookie ───────────────│                                    │
+      │      (samvad_session = rawToken)         │                                    │
+      │                                          │                                    │
+      │── 8. Subsequent Request + Cookie ───────►│                                    │
+      │                                          │── 9. Hash cookie value with SHA-256│
+      │                                          │      Lookup Session + User in DB ─►│
+      │                                          │◄─ 10. Return user + check active ──│
 ```
 
-### State Definitions
-- `SUBMITTED`: Lodged by student; pending initial acknowledgement by Course Coordinator.
-- `UNDER_REVIEW`: Actively being evaluated by the authorized officer at the current tier.
-- `AWAITING_STUDENT_INFO`: Document request issued to student; awaiting student upload.
-- `FORWARDED`: Formally transferred to the next higher administrative tier.
-- `RESOLVED`: Final closure issued with formal findings and remedy recorded.
-- `DISMISSED`: Grievance evaluated and formally closed with recorded grounds (e.g. invalid jurisdiction).
+- **Session Generation**: 32 bytes of cryptographically secure random entropy (`crypto.randomBytes(32)`).
+- **At-Rest Protection**: Database stores only SHA-256 digests (`hashSessionToken`). A database leak does not expose active session cookies.
+- **Timing Equalization**: When an identifier does not exist in the database, `dummyVerifyPassword` executes a 12-round bcrypt calculation against `DUMMY_BCRYPT_HASH`, ensuring constant response latency (~70–100ms) to defeat user enumeration attacks.
+- **Immediate Invalidation**: `revokeAllUserSessions(userId)` executes an atomic bulk deletion of all sessions for a user upon account deactivation or password reset.
+
+### 4.2 Server-Side Authorization Boundary
+- Edge middleware (`src/middleware.ts`) provides preliminary routing defense by verifying the presence of the session cookie.
+- Every Server Component, API route handler, and Server Action performs independent database session validation via `getSessionUser()`, `requireAuth()`, or `requireRole()`.
+- Client-side navigation or component visibility is treated purely as UI ergonomics, never as a security boundary.
 
 ---
 
-## 6. Audit Trail & Immutability Architecture
+## 5. Dynamic Academic Routing & Authority Model
 
-Accountability requires that no action, remark, or transition can be edited or deleted once recorded.
+To fulfill Non-Negotiable Requirement 4, academic units, courses, and authority mappings are decoupled from application code:
 
-### 6.1 Data Structure
-The `GrievanceTimelineAction` table acts as an append-only ledger:
-- `id`: Unique identifier (UUID).
-- `complaintId`: Associated grievance ID.
-- `actorId`: User ID of who took the action.
-- `actorRole`: Snapshot of role at time of action.
-- `actionType`: `SUBMITTED`, `ASSIGNED`, `UNDER_REVIEW_MARKED`, `DOCUMENTS_REQUESTED`, `DOCUMENTS_SUBMITTED`, `INTERNAL_REMARK_ADDED`, `FORWARDED`, `RESOLVED`, `DISMISSED`.
-- `fromStatus` & `toStatus`: State machine snapshot.
-- `fromTier` & `toTier`: Tier level transitions (e.g., `TIER_1_COORDINATOR` $\rightarrow$ `TIER_2_HOD`).
-- `remarks`: Human comments / rationale.
-- `visibility`: `PUBLIC_TO_STUDENT` or `INTERNAL_STAFF_ONLY`.
-- `ipAddress`: Client IP for forensic integrity.
-- `createdAt`: Immutable timestamp (`now()`).
+```
+                  ┌──────────────────────┐
+                  │      Department      │
+                  │ (e.g. MATH, Physics) │
+                  └──────────┬───────────┘
+                             │ 1-to-many
+                             ▼
+                  ┌──────────────────────┐
+                  │        Course        │
+                  │ (e.g. M.Sc. Math)    │
+                  └──────────┬───────────┘
+                             │
+                             ▼
+               ┌───────────────────────────┐
+               │      StaffAssignment      │
+               │ - userId                  │
+               │ - role (CC / HoD)         │
+               │ - departmentId            │
+               │ - courseId (Nullable)     │
+               │ - isActive                │
+               │ - assignedAt              │
+               │ - unassignedAt            │
+               └─────────────┬─────────────┘
+                             │
+                             ▼
+  ┌─────────────────────────────────────────────────────┐
+  │ Grievance Routing Engine                            │
+  │ When a grievance is lodged for Course C in Dept D:  │
+  │ 1. Tier 1 Coordinator = StaffAssignment(courseId=C) │
+  │ 2. Tier 2 HoD         = StaffAssignment(deptId=D)   │
+  │ 3. Tier 3 Director    = User(role=DIRECTOR)         │
+  └─────────────────────────────────────────────────────┘
+```
 
-### 6.2 Transactional Guarantees
-All state transitions are executed within Prisma `$transaction([ ... ])` blocks ensuring that status updates and audit logs are atomic. If the audit log fails, the status update rolls back completely.
+- **Zero Hardcoding**: Departments and courses are loaded dynamically from `Department` and `Course` tables.
+- **Tenure History**: Reassigning a coordinator does not delete past assignments. Old records have `isActive = false` and `unassignedAt = now()`, preserving historical accountability.
+- **Routing Resolution**: When a coordinator logs in, their grievance queue is dynamically queried based on their active assignments:
+  `WHERE courseId IN (SELECT courseId FROM StaffAssignment WHERE userId = :currentUserId AND isActive = true)`
 
 ---
 
-## 7. Error Handling & Resilience
+## 6. Grievance Redressal Workflow & State Machine
 
-1. **Client Error Boundaries**: React `error.tsx` boundaries at root and dashboard sub-routes to gracefully catch and display recovery options without application crashes.
-2. **Structured Server Action Responses**: Standardized JSON response envelope:
-   ```typescript
-   type ActionResponse<T> = 
-     | { success: true; data: T; message?: string }
-     | { success: false; error: string; code: 'UNAUTHORIZED' | 'VALIDATION_FAILED' | 'NOT_FOUND' | 'FORBIDDEN' | 'CONFLICT' | 'INTERNAL_ERROR' };
-   ```
-3. **Database Connection Resilience**: Neon serverless pooling via pgBouncer connection string ensures no connection exhaustion under burst loads.
+```
+                              ┌────────────────────┐
+                              │     Lodged by      │
+                              │      STUDENT       │
+                              └─────────┬──────────┘
+                                        │
+                                        ▼
+                              ┌────────────────────┐
+                              │     SUBMITTED      │
+                              └─────────┬──────────┘
+                                        │
+                    ┌───────────────────┴───────────────────┐
+                    ▼                                       │
+         ┌─────────────────────┐                            │
+         │    UNDER_REVIEW     │◄───────────────────────────┘
+         │ (Coordinator Tier 1)│
+         └──────────┬──────────┘
+                    │
+         ┌──────────┼────────────────────────────┐
+         │ Doc Req  │ Resolved                   │ Forwarded
+         ▼          ▼                            ▼
+┌─────────────────┐ ┌──────────┐      ┌─────────────────────┐
+│AWAITING_STUDENT_│ │ RESOLVED │      │     FORWARDED       │
+│      INFO       │ └──────────┘      │  (HoD Tier 2 Queue) │
+└────────┬────────┘                   └──────────┬──────────┘
+         │                                       │
+         │ Uploaded                              ▼
+         └───────────────────────────►┌─────────────────────┐
+                                      │    UNDER_REVIEW     │
+                                      │     (HoD Tier 2)    │
+                                      └──────────┬──────────┘
+                                                 │
+                                      ┌──────────┼───────────────┐
+                                      │ Doc Req  │ Resolved /    │ Forwarded
+                                      ▼          ▼ Dismissed     ▼
+                             ┌─────────────────┐ ┌──────────┐  ┌─────────────────────┐
+                             │AWAITING_STUDENT_│ │ RESOLVED/│  │     FORWARDED       │
+                             │      INFO       │ │ DISMISSED│  │ (Director Tier 3)   │
+                             └─────────────────┘ └──────────┘  └──────────┬──────────┘
+                                                                          │
+                                                                          ▼
+                                                               ┌─────────────────────┐
+                                                               │    UNDER_REVIEW     │
+                                                               │  (Director Tier 3)  │
+                                                               └──────────┬──────────┘
+                                                                          │
+                                                               ┌──────────┴──────────┐
+                                                               ▼                     ▼
+                                                          ┌──────────┐          ┌──────────┐
+                                                          │ RESOLVED │          │DISMISSED │
+                                                          └──────────┘          └──────────┘
+```
+
+### Dual-Track Timeline Architecture
+Every grievance action is recorded in `GrievanceTimelineAction` with an explicit `visibility` flag:
+1. **`PUBLIC_TO_STUDENT`**: Visible to the student on their portal and on the public tracking page (e.g. "Case acknowledged by Course Coordinator", "Forwarded to Department Head", "Resolution Issued").
+2. **`INTERNAL_STAFF_ONLY`**: Visible exclusively to authorized staff officials (e.g., faculty internal remarks, HoD forwarding notes, investigative directives). Students and public viewers cannot access internal remarks.
 
 ---
 
-## 8. Accessibility & Usability (WCAG 2.1 AA)
+## 7. Secure Document Ingestion & Streaming Pipeline
 
-- **Semantic HTML**: Landmarks (`<main>`, `<nav>`, `<aside>`, `<header>`).
-- **Form Controls**: Explicit `<label>` elements linked via `htmlFor`, error messages linked with `aria-errormessage` and `aria-invalid`.
-- **Keyboard Navigation**: Standard Tab / Shift+Tab cycling, Escape to dismiss modals, visible focus indicators (`focus-visible:ring-2 focus-visible:ring-primary`).
-- **Contrast**: Strict compliance with APCA / WCAG AA ratios (text $\ge 4.5:1$, icons $\ge 3:1$).
+1. **Validation at Ingestion**:
+   - Client sends file to Server Action / Route Handler.
+   - Server validates MIME type (`application/pdf`, `image/jpeg`, `image/png`).
+   - Server reads initial 512 bytes to verify magic numbers:
+     - PDF: `%PDF-` (`0x25 0x50 0x44 0x46`)
+     - PNG: `\x89PNG\r\n\x1a\n` (`0x89 0x50 0x4E 0x47`)
+     - JPEG: `\xFF\xD8\xFF`
+   - File size capped at 5 MB per attachment.
+2. **Checksum & Storage**:
+   - SHA-256 checksum calculated on file stream.
+   - Storage key generated with random UUID: `grievances/[grievanceId]/[uuid]_[sanitizedFileName]`.
+   - File metadata written to `GrievanceDocument` table.
+3. **Protected Streaming**:
+   - Evidentiary files are never served from public web roots (`public/`).
+   - Streamed via authenticated route `/api/documents/[documentId]`.
+   - Route verifies caller session: must be the student owner or an authorized official assigned to that grievance's course/department or Director.
 
 ---
 
-## 9. Deployment & Infrastructure Strategy
+## 8. Rate Limiting & Multi-Instance Roadmap
 
-- **Application Host**: Vercel or Node.js container (Docker) deployed on institutional / cloud server.
-- **Database**: Neon Serverless PostgreSQL (AWS ap-south-1 / Mumbai or closest low-latency region).
-- **Environment Variables**:
-  - `DATABASE_URL`: Direct connection string for Prisma migrations.
-  - `DATABASE_URL_POOLED`: Pooled connection string (`?pgbouncer=true`) for Next.js runtime.
-  - `SESSION_SECRET`: 64-character secret for cryptographic signing.
-  - `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`: Private storage configuration.
+- **Current Status**: Local in-memory sliding-window limiter in `src/lib/auth/rate-limit.ts`.
+- **Architectural Blocker**: In-memory storage is process-bound. In multi-pod deployments or serverless platforms (Vercel), memory resets on restarts and cold boots, and is not shared across instances.
+- **Production Roadmap**:
+  - Connect to an external shared Redis store (Upstash Redis via `@upstash/ratelimit`).
+  - Implement compound rate limit keying (`client_ip:identifier`) to prevent deliberate account lockout attacks against known student roll numbers.
+  - Fail-Secure policy with in-memory fallback during external cache outages.

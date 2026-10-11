@@ -76,17 +76,22 @@ export async function createSession(userId: string): Promise<{ token: string; ex
     },
   });
 
-  // Set HTTP-only, secure cookie
-  const cookieStore = cookies();
-  cookieStore.set({
-    name: SESSION_COOKIE_NAME,
-    value: rawToken,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_DURATION_SECONDS,
-  });
+  // Set HTTP-only, secure cookie with exact path and expiry
+  try {
+    const cookieStore = cookies();
+    cookieStore.set({
+      name: SESSION_COOKIE_NAME,
+      value: rawToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: SESSION_DURATION_SECONDS,
+      expires: expiresAt,
+    });
+  } catch {
+    // In test runners or background tasks outside Next.js request context, cookies() is not available
+  }
 
   return { token: rawToken, expiresAt };
 }
@@ -145,8 +150,21 @@ export async function getSessionUser(): Promise<AuthUser | null> {
 
     const result = await validateSessionToken(token);
     if (!result.user && (result.reason === "EXPIRED" || result.reason === "DEACTIVATED")) {
-      // Clear cookie if expired or deactivated
-      cookieStore.delete(SESSION_COOKIE_NAME);
+      // Clear cookie if expired or deactivated (safely ignored in read-only Server Component contexts)
+      try {
+        cookieStore.set({
+          name: SESSION_COOKIE_NAME,
+          value: "",
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 0,
+          expires: new Date(0),
+        });
+      } catch {
+        // Expected in Server Component rendering contexts where cookies() is read-only
+      }
     }
 
     return result.user;
@@ -170,11 +188,50 @@ export async function destroySession(): Promise<void> {
       });
     }
 
-    cookieStore.delete(SESSION_COOKIE_NAME);
+    try {
+      cookieStore.set({
+        name: SESSION_COOKIE_NAME,
+        value: "",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
+        expires: new Date(0),
+      });
+    } catch {
+      try {
+        cookieStore.delete(SESSION_COOKIE_NAME);
+      } catch {}
+    }
   } catch (err) {
     // Ensure cookie is deleted even if database delete encounters an issue
     try {
-      cookies().delete(SESSION_COOKIE_NAME);
+      cookies().set({
+        name: SESSION_COOKIE_NAME,
+        value: "",
+        path: "/",
+        maxAge: 0,
+        expires: new Date(0),
+      });
     } catch {}
+  }
+}
+
+/**
+ * Invalidate all active sessions for a specific user across all devices.
+ * Essential for immediate revocation during administrative account deactivation,
+ * password resets, or incident response.
+ */
+export async function revokeAllUserSessions(userId: string): Promise<number> {
+  if (!userId) return 0;
+  try {
+    const result = await prisma.session.deleteMany({
+      where: { userId },
+    });
+    return result.count;
+  } catch (error) {
+    console.error(`Failed to revoke sessions for user ${userId}:`, error);
+    throw error;
   }
 }

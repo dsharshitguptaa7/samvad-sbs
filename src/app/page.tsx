@@ -1,8 +1,12 @@
 import React from "react";
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { getSessionUser } from "@/lib/auth/session";
+import { getRoleDashboardPath } from "@/lib/auth/role-routing";
 import { NoticeBanner } from "@/components/NoticeBanner";
 import { WorkflowSteps } from "@/components/WorkflowSteps";
 import { DepartmentCard } from "@/components/DepartmentCard";
+import { HeroTrackingCard } from "@/components/HeroTrackingCard";
 import {
   ShieldCheck,
   FileText,
@@ -17,65 +21,90 @@ import {
   FlaskConical,
   Compass,
   Trees,
+  GraduationCap,
+  Sparkles,
+  Code2,
+  CheckCircle2,
+  BookOpen,
 } from "lucide-react";
 
-export default function HomePage() {
-  const departments = [
-    {
-      name: "Department of Mathematics",
-      code: "MATH",
-      programs: ["B.Sc. Mathematics", "M.Sc. Mathematics", "Ph.D. Mathematics"],
-      description:
-        "Pure & Applied Mathematics, Numerical Analysis, Mathematical Modeling, and Operational Research.",
-      icon: <Binary className="w-6 h-6" aria-hidden="true" />,
-    },
-    {
-      name: "Department of Physics",
-      code: "PHYS",
-      programs: ["B.Sc. Physics", "M.Sc. Physics", "Ph.D. Physics"],
-      description:
-        "Condensed Matter Physics, Electronics, Nuclear Physics, Optics, and Advanced Experimental Laboratories.",
-      icon: <Atom className="w-6 h-6" aria-hidden="true" />,
-    },
-    {
-      name: "Department of Chemistry",
-      code: "CHEM",
-      programs: ["B.Sc. Chemistry", "M.Sc. Chemistry", "Ph.D. Chemistry"],
-      description:
-        "Organic, Inorganic, Physical, and Analytical Chemistry with state-of-the-art wet lab infrastructure.",
-      icon: <FlaskConical className="w-6 h-6" aria-hidden="true" />,
-    },
-    {
-      name: "Department of Geography",
-      code: "GEOG",
-      programs: ["B.A. / B.Sc. Geography", "M.A. / M.Sc. Geography"],
-      description:
-        "Geomorphology, Cartography, GIS & Remote Sensing, Climatology, and Regional Planning Studies.",
-      icon: <Compass className="w-6 h-6" aria-hidden="true" />,
-    },
-    {
-      name: "Department of Environmental Sciences",
-      code: "ENVS",
-      programs: ["M.Sc. Environmental Science", "Ph.D. Environmental Science"],
-      description:
-        "Ecological Conservation, Environmental Pollution & Toxicology, Waste Management, and Climate Dynamics.",
-      icon: <Trees className="w-6 h-6" aria-hidden="true" />,
-    },
-  ];
+// Server component — dynamically fetch active departments from database
+export const dynamic = "force-dynamic";
+
+function getDepartmentIcon(code: string) {
+  switch (code.toUpperCase()) {
+    case "MATH":
+      return <Binary className="w-6 h-6" aria-hidden="true" />;
+    case "PHYS":
+      return <Atom className="w-6 h-6" aria-hidden="true" />;
+    case "CHEM":
+      return <FlaskConical className="w-6 h-6" aria-hidden="true" />;
+    case "GEOG":
+      return <Compass className="w-6 h-6" aria-hidden="true" />;
+    case "ENVS":
+      return <Trees className="w-6 h-6" aria-hidden="true" />;
+    default:
+      return <GraduationCap className="w-6 h-6" aria-hidden="true" />;
+  }
+}
+
+export default async function HomePage() {
+  const currentUser = await getSessionUser();
+
+  // Query active departments with active courses dynamically from database
+  let departments: Array<{
+    name: string;
+    code: string;
+    programs: string[];
+    description: string;
+    icon: React.ReactNode;
+  }> = [];
+
+  try {
+    const dbDepartments = await prisma.department.findMany({
+      where: { isActive: true },
+      include: {
+        courses: {
+          where: { isActive: true },
+          select: { name: true },
+          orderBy: { name: "asc" },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    departments = dbDepartments.map((dept) => ({
+      name: dept.name,
+      code: dept.code,
+      programs: dept.courses.map((c) => c.name),
+      description: dept.description || "Academic programs and research laboratories in the School of Basic Sciences.",
+      icon: getDepartmentIcon(dept.code),
+    }));
+  } catch (error) {
+    console.error("Failed to fetch departments from database:", error);
+  }
 
   return (
     <div className="space-y-16 pb-16">
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-csjmu-900 to-csjmu-950 text-white pt-12 pb-20 px-4 sm:px-6 lg:px-8 border-b border-csjmu-800">
-        <div className="max-w-7xl mx-auto">
-          {/* Top Badge */}
+      <section className="bg-gradient-to-b from-csjmu-900 via-csjmu-950 to-csjmu-950 text-white pt-12 pb-20 px-4 sm:px-6 lg:px-8 border-b border-csjmu-800 relative overflow-hidden">
+        {/* Subtle background glow effect */}
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-gold-400/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          {/* Top Institutional Badge */}
           <div className="flex flex-wrap items-center gap-2 mb-6">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gold-400/20 text-gold-300 border border-gold-400/30">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gold-400/15 text-gold-300 border border-gold-400/30 shadow-sm">
               <ShieldCheck className="w-4 h-4 text-gold-400" aria-hidden="true" />
-              Official Portal &bull; School of Basic Sciences
+              Statutory Redressal Portal &bull; School of Basic Sciences
             </span>
             <span className="text-xs text-slate-400 hidden sm:inline">
               Chhatrapati Shahu Ji Maharaj University, Kanpur
+            </span>
+            <span className="hidden md:inline-block w-1 h-1 rounded-full bg-slate-600" />
+            <span className="text-xs text-slate-400 hidden md:inline">
+              NAAC Accredited A++
             </span>
           </div>
 
@@ -85,35 +114,57 @@ export default function HomePage() {
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight">
                 Transparent, Multi-Tier Grievance Redressal for Basic Sciences
               </h1>
-              <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl">
+              <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl font-normal">
                 <strong>SAMVAD</strong> connects students directly with their Course Coordinators, Department Heads, and the School Director. Every grievance is adjudicated strictly by authorized human officials through an immutable, auditable workflow.
               </p>
 
               {/* Action Buttons */}
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <Link
-                  href="/register"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-lg focus-visible:ring-white"
-                >
-                  <span>Student Registration</span>
-                  <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                </Link>
+                {currentUser && currentUser.isActive ? (
+                  <>
+                    <Link
+                      href={getRoleDashboardPath(currentUser.role)}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-lg focus-visible:ring-white"
+                    >
+                      <span>Go to My Dashboard ({currentUser.role})</span>
+                      <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                    </Link>
 
-                <Link
-                  href="/track"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-sm font-semibold text-white bg-csjmu-800 hover:bg-csjmu-700 transition border border-csjmu-700 focus-visible:ring-white"
-                >
-                  <Search className="w-4 h-4 text-gold-400" aria-hidden="true" />
-                  <span>Track Grievance Status</span>
-                </Link>
+                    <Link
+                      href="/track"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-sm font-semibold text-white bg-csjmu-800 hover:bg-csjmu-700 transition border border-csjmu-700 focus-visible:ring-white"
+                    >
+                      <Search className="w-4 h-4 text-gold-400" aria-hidden="true" />
+                      <span>Track Grievance Status</span>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/register"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-lg focus-visible:ring-white"
+                    >
+                      <span>Student Registration</span>
+                      <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                    </Link>
 
-                <Link
-                  href="/login"
-                  className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/10 transition"
-                >
-                  <UserCheck className="w-4 h-4 text-slate-400" aria-hidden="true" />
-                  <span>Staff Portal</span>
-                </Link>
+                    <Link
+                      href="/track"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg text-sm font-semibold text-white bg-csjmu-800 hover:bg-csjmu-700 transition border border-csjmu-700 focus-visible:ring-white"
+                    >
+                      <Search className="w-4 h-4 text-gold-400" aria-hidden="true" />
+                      <span>Track Grievance Status</span>
+                    </Link>
+
+                    <Link
+                      href="/login"
+                      className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/10 transition"
+                    >
+                      <UserCheck className="w-4 h-4 text-slate-400" aria-hidden="true" />
+                      <span>Staff Portal</span>
+                    </Link>
+                  </>
+                )}
               </div>
 
               {/* Quick Policy Reassurance */}
@@ -128,61 +179,14 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-gold-400" aria-hidden="true" />
-                  <span>Zero Automated/AI Decisions</span>
+                  <span>Zero Automated / AI Decisions</span>
                 </div>
               </div>
             </div>
 
-            {/* Hero Right: Quick Status / Fast Lookup Box */}
+            {/* Hero Right: Direct Status Check Form */}
             <div className="lg:col-span-5">
-              <div className="bg-white rounded-2xl p-6 sm:p-8 text-slate-900 shadow-2xl border border-slate-200">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-lg bg-csjmu-900 text-gold-400 flex items-center justify-center">
-                      <Search className="w-5 h-5" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-bold text-slate-900">Direct Status Check</h2>
-                      <p className="text-xs text-slate-500">Check grievance using reference token</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                    24x7
-                  </span>
-                </div>
-
-                <div className="mt-5 space-y-4">
-                  <div>
-                    <label htmlFor="hero-tracking" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Grievance Tracking Number
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="hero-tracking"
-                        type="text"
-                        placeholder="e.g. CSJMU-SBS-2026-MATH-0142"
-                        className="w-full px-3.5 py-2.5 text-xs font-mono rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
-                        disabled
-                      />
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Sample format: CSJMU-SBS-YYYY-[DEPT]-[SEQ]
-                    </p>
-                  </div>
-
-                  <Link
-                    href="/track"
-                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-semibold text-white bg-csjmu-900 hover:bg-csjmu-800 transition"
-                  >
-                    <span>Inspect Public Tracking View</span>
-                    <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-                  </Link>
-
-                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-900">
-                    <strong>Foundation Notice:</strong> Tracking lookup backend is scheduled for activation in Phase 3.
-                  </div>
-                </div>
-              </div>
+              <HeroTrackingCard />
             </div>
           </div>
         </div>
@@ -190,11 +194,11 @@ export default function HomePage() {
 
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-        {/* Foundation Notice Banner */}
+        {/* Official Directives Notice Banner */}
         <NoticeBanner
-          title="Foundation Stage Notice (Phase 0/1 Active)"
-          message="SAMVAD Portal foundation is actively configured. Visual layouts, navigation, and accessibility scaffolds are rendered below. User registration, credential authentication, and database grievance persistence will be activated in upcoming phases. All forms are marked nonfunctional."
-          variant="warning"
+          title="Institutional Directive & Operational Governance"
+          message="SAMVAD is the statutory grievance redressal system of the School of Basic Sciences under CSJMU Regulations. All academic and administrative grievances are processed strictly through human-supervised review tiers, maintaining comprehensive audit trails and data confidentiality across all SBS departments."
+          variant="info"
         />
 
         {/* 4 Pillars of SAMVAD */}
@@ -204,13 +208,14 @@ export default function HomePage() {
               Institutional Principles
             </span>
             <h2 id="pillars-heading" className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-2">
-              Engineered for Fairness, Transparency & Accountability
+              Engineered for Fairness, Transparency &amp; Accountability
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="w-10 h-10 rounded-lg bg-csjmu-50 border border-csjmu-100 flex items-center justify-center text-csjmu-800 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-blue-600" />
+              <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 mb-4 group-hover:scale-105 transition-transform">
                 <UserCheck className="w-5 h-5" aria-hidden="true" />
               </div>
               <h3 className="text-base font-bold text-slate-900">No Automated Decisions</h3>
@@ -219,8 +224,9 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="w-10 h-10 rounded-lg bg-csjmu-50 border border-csjmu-100 flex items-center justify-center text-csjmu-800 mb-4">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500" />
+              <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 mb-4 group-hover:scale-105 transition-transform">
                 <FileText className="w-5 h-5" aria-hidden="true" />
               </div>
               <h3 className="text-base font-bold text-slate-900">Document Clarification</h3>
@@ -229,8 +235,9 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="w-10 h-10 rounded-lg bg-csjmu-50 border border-csjmu-100 flex items-center justify-center text-csjmu-800 mb-4">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-600" />
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 mb-4 group-hover:scale-105 transition-transform">
                 <Clock className="w-5 h-5" aria-hidden="true" />
               </div>
               <h3 className="text-base font-bold text-slate-900">Immutable Audit Trail</h3>
@@ -239,13 +246,14 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <div className="w-10 h-10 rounded-lg bg-csjmu-50 border border-csjmu-100 flex items-center justify-center text-csjmu-800 mb-4">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-purple-600" />
+              <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 mb-4 group-hover:scale-105 transition-transform">
                 <Lock className="w-5 h-5" aria-hidden="true" />
               </div>
               <h3 className="text-base font-bold text-slate-900">Strict Data Isolation</h3>
               <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                Course Coordinators and HoDs only see grievances in their designated department. Student grievances remain private.
+                Course Coordinators and HoDs only see grievances in their designated department. Student grievances remain strictly private.
               </p>
             </div>
           </div>
@@ -282,68 +290,151 @@ export default function HomePage() {
                 Grievances are categorized and routed according to the student&apos;s enrolled department and course.
               </p>
             </div>
-            <div className="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-md">
-              Additional departments dynamically configurable by Administrator
+            <div className="text-xs text-slate-600 bg-slate-100 px-3.5 py-1.5 rounded-lg border border-slate-200/80 font-medium">
+              Dynamically loaded from University Master Database
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {departments.map((dept) => (
-              <DepartmentCard
-                key={dept.code}
-                name={dept.name}
-                code={dept.code}
-                programs={dept.programs}
-                description={dept.description}
-                icon={dept.icon}
-              />
-            ))}
-          </div>
+          {departments.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">
+              <p className="text-sm font-semibold">No active academic departments found.</p>
+              <p className="text-xs text-slate-400 mt-1">The system administrator can configure academic departments in the Admin Panel.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {departments.map((dept) => (
+                <DepartmentCard
+                  key={dept.code}
+                  name={dept.name}
+                  code={dept.code}
+                  programs={dept.programs}
+                  description={dept.description}
+                  icon={dept.icon}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
-        {/* FAQ & Policy Guidelines */}
-        <section aria-labelledby="guidelines-heading" className="bg-white rounded-2xl p-8 border border-slate-200 space-y-6 shadow-sm">
+        {/* Grievance Lodging Guidelines & Rules */}
+        <section aria-labelledby="guidelines-heading" className="bg-white rounded-2xl p-8 border border-slate-200/90 space-y-6 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-csjmu-900 text-gold-400 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-xl bg-csjmu-900 text-gold-400 flex items-center justify-center shadow-sm">
               <HelpCircle className="w-6 h-6" aria-hidden="true" />
             </div>
             <div>
               <h2 id="guidelines-heading" className="text-xl font-bold text-slate-900">
-                Grievance Lodging Guidelines & Rules
+                Grievance Lodging Guidelines &amp; Procedural Rules
               </h2>
               <p className="text-xs text-slate-500">
-                General instructions for students of the School of Basic Sciences
+                Official statutory regulations for students and researchers of the School of Basic Sciences
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-slate-700">
-            <div className="space-y-2">
-              <h3 className="font-bold text-slate-900 text-sm">Valid Grievance Categories</h3>
-              <p className="leading-relaxed">
-                Academic Curriculum, Internal Assessment / Test Evaluations, Laboratory & Instrument Facilities, Departmental Fee / Receipt Issues, Faculty Mentorship, and General Administrative Services within SBS.
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <span className="w-2 h-2 rounded-full bg-csjmu-700" />
+                <h3>Valid Grievance Categories</h3>
+              </div>
+              <p className="leading-relaxed text-slate-600">
+                Academic Curriculum, Internal Assessment / Test Evaluations, Laboratory &amp; Instrument Facilities, Departmental Fee / Receipt Issues, Faculty Mentorship, and General Administrative Services within SBS.
               </p>
             </div>
 
-            <div className="space-y-2">
-              <h3 className="font-bold text-slate-900 text-sm">Evidentiary Supporting Documents</h3>
-              <p className="leading-relaxed">
-                Students can attach up to 3 supporting documents (PDF, JPEG, PNG, max 5MB each). Falsification of documents attracts university disciplinary procedures under CSJMU code of conduct.
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <span className="w-2 h-2 rounded-full bg-csjmu-700" />
+                <h3>Evidentiary Supporting Documents</h3>
+              </div>
+              <p className="leading-relaxed text-slate-600">
+                Students can attach up to 3 supporting documents (PDF, JPEG, PNG, max 5MB each). Falsification of documents attracts university disciplinary procedures under the CSJMU Code of Conduct.
               </p>
             </div>
 
-            <div className="space-y-2">
-              <h3 className="font-bold text-slate-900 text-sm">Document Request Responding</h3>
-              <p className="leading-relaxed">
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <span className="w-2 h-2 rounded-full bg-csjmu-700" />
+                <h3>Document Request Responding</h3>
+              </div>
+              <p className="leading-relaxed text-slate-600">
                 If the Course Coordinator or Department Head requests additional proofs, the student will receive an in-portal notification. The case status remains in <em>Awaiting Student Info</em> until uploaded.
               </p>
             </div>
 
-            <div className="space-y-2">
-              <h3 className="font-bold text-slate-900 text-sm">Resolution & Appeals</h3>
-              <p className="leading-relaxed">
-                Once a resolution is recorded by an official, the student receives the formal resolution summary. If dissatisfied, an appeal may be escalated to the next tier within the approved window.
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <span className="w-2 h-2 rounded-full bg-csjmu-700" />
+                <h3>Resolution &amp; Appellate Appeals</h3>
+              </div>
+              <p className="leading-relaxed text-slate-600">
+                Once a resolution is recorded by an official, the student receives the formal resolution summary. If dissatisfied, an appeal may be escalated to the next tier within the approved statutory window.
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Portal Engineering & Innovation Credit Section */}
+        <section aria-labelledby="credits-heading" className="bg-gradient-to-r from-csjmu-950 via-csjmu-900 to-csjmu-950 rounded-2xl p-8 sm:p-10 text-white shadow-xl border border-csjmu-800 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gold-400/5 rounded-full blur-2xl pointer-events-none" />
+
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="lg:col-span-8 space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-400/10 border border-gold-400/30 text-gold-300 text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5 text-gold-400" />
+                <span>Academic Innovation &bull; System Engineering</span>
+              </div>
+
+              <h2 id="credits-heading" className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                Engineered for Institutional Integrity
+              </h2>
+
+              <p className="text-sm text-slate-300 leading-relaxed">
+                SAMVAD is engineered to eliminate opaque processing and algorithmic bias in academic grievance administration. Developed in collaboration with the School of Basic Sciences, the platform pairs deterministic state transitions with cryptographic audit logging.
+              </p>
+
+              <div className="pt-2 flex flex-wrap items-center gap-4 text-xs text-slate-300">
+                <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Deterministic Workflow</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Immutable Audit Ledger</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Strict Role-Based Scoping</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Author Credit Card */}
+            <div className="lg:col-span-4 bg-white/5 border border-white/15 rounded-xl p-5 text-center sm:text-left space-y-3 backdrop-blur-sm">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gold-400">
+                <Code2 className="w-4 h-4" />
+                <span>System Authorship</span>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400 font-medium">Designed and Developed by</p>
+                <p className="text-base font-bold text-white mt-0.5">
+                  Harshit Gupta &amp; Anshika Soni
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 text-xs text-slate-300 space-y-1">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-gold-400 shrink-0" />
+                  <span className="font-medium text-gold-300">
+                    M.Sc Mathematics with AI and DS
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 pl-6">
+                  Department of Mathematics, School of Basic Sciences, CSJMU Kanpur
+                </p>
+              </div>
             </div>
           </div>
         </section>

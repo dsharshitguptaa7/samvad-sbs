@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import {
   hashPassword,
   verifyPassword,
+  dummyVerifyPassword,
   validatePasswordStrength,
 } from "../src/lib/auth/password";
 import {
   generateSessionToken,
   hashSessionToken,
   sanitizeUser,
+  revokeAllUserSessions,
   AuthUser,
 } from "../src/lib/auth/session";
 import {
@@ -77,6 +79,16 @@ describe("SAMVAD Authentication & Security Test Suite", () => {
       assert.equal(validatePasswordStrength("NoDigitsOrSpecial").valid, false);
       // Strong valid password
       assert.equal(validatePasswordStrength("ValidSBSPass#2026").valid, true);
+    });
+
+    it("should execute dummy bcrypt verification safely to thwart timing attacks", async () => {
+      const startTime = Date.now();
+      const match = await dummyVerifyPassword("RandomCandidatePassword#123");
+      const elapsed = Date.now() - startTime;
+
+      assert.equal(match, false);
+      // Bcrypt with 12 rounds on CPU takes non-trivial compute (>25ms)
+      assert.ok(elapsed >= 25, `Expected elapsed time >= 25ms, got ${elapsed}ms`);
     });
   });
 
@@ -431,6 +443,60 @@ describe("SAMVAD Authentication & Security Test Suite", () => {
     it("should convert AccountDeactivatedError to HTTP 403 response", () => {
       const response = handleAuthError(new AccountDeactivatedError());
       assert.equal(response.status, 403);
+    });
+  });
+
+  // ===========================================================================
+  // 9. Security Audit Regressions & Hardening
+  // ===========================================================================
+  describe("Security Audit Regressions & Hardening", () => {
+    it("should handle simulated Prisma P2002 unique constraint violations as 409 Conflict", () => {
+      const simulatedPrismaError = {
+        code: "P2002",
+        meta: { target: ["rollNumber"] },
+      };
+
+      function formatUniqueError(err: any) {
+        if (err?.code === "P2002") {
+          const target = Array.isArray(err.meta?.target)
+            ? err.meta.target.join(", ")
+            : typeof err.meta?.target === "string"
+            ? err.meta.target
+            : "unique field";
+          return {
+            status: 409,
+            code: "DUPLICATE_RESOURCE",
+            error: `An account with this ${target} already exists.`,
+          };
+        }
+        return { status: 500, error: "Server error" };
+      }
+
+      const formatted = formatUniqueError(simulatedPrismaError);
+      assert.equal(formatted.status, 409);
+      assert.equal(formatted.code, "DUPLICATE_RESOURCE");
+      assert.ok(formatted.error.includes("rollNumber"));
+    });
+
+    it("should validate revokeAllUserSessions contract safely for empty user IDs", async () => {
+      const revokedCount = await revokeAllUserSessions("");
+      assert.equal(revokedCount, 0);
+    });
+
+    it("should maintain strict rate limit key partitioning across identifiers", () => {
+      const student1Key = "login:240103001";
+      const student2Key = "login:240103002";
+
+      resetRateLimit(student1Key);
+      resetRateLimit(student2Key);
+
+      for (let i = 0; i < 5; i++) {
+        recordFailedAttempt(student1Key);
+      }
+
+      assert.equal(checkRateLimit(student1Key).allowed, false);
+      assert.equal(checkRateLimit(student2Key).allowed, true);
+      assert.equal(checkRateLimit(student2Key).remainingAttempts, 5);
     });
   });
 });

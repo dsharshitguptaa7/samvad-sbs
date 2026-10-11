@@ -25,6 +25,11 @@ export const metadata: Metadata = {
     { name: "School of Basic Sciences, CSJMU Kanpur" },
   ],
   creator: "Harshit Gupta and Anshika Soni (M.Sc Mathematics with AI and DS)",
+  icons: {
+    icon: "/assets/csjmu-emblem.png",
+    shortcut: "/assets/csjmu-emblem.png",
+    apple: "/assets/csjmu-emblem.png",
+  },
 };
 
 export default function RootLayout({

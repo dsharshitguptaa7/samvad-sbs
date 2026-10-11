@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import {
   Search,
   Clock,
@@ -116,22 +117,45 @@ function TrackGrievanceContent() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Page Header */}
-      <div className="border-b border-slate-200 pb-6">
-        <div className="flex items-center gap-2 text-xs font-semibold text-csjmu-800 uppercase tracking-wider mb-2">
-          <Search className="w-4 h-4 text-csjmu-700" aria-hidden="true" />
-          <span>Grievance Transparency Desk</span>
+      <div className="border-b border-slate-200 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-csjmu-800 uppercase tracking-wider mb-2">
+            <Search className="w-4 h-4 text-csjmu-700" aria-hidden="true" />
+            <span>Grievance Transparency Desk</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-serif">
+            Track Grievance Redressal Status
+          </h1>
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Enter your official tracking token to check real-time progress across review tiers.
+            For privacy protection, student identity and confidential files are strictly hidden on public lookups.
+          </p>
         </div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-          Track Grievance Redressal Status
-        </h1>
-        <p className="mt-1 text-sm text-slate-600 leading-relaxed">
-          Enter your official tracking token to check real-time progress across review tiers.
-          For privacy protection, student identity and confidential files are strictly hidden on public lookups.
-        </p>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-11 h-11 bg-white rounded-full p-1 border border-gold-500/60 shadow-sm shrink-0 flex items-center justify-center">
+            <Image
+              src="/assets/csjmu-emblem.png"
+              alt="CSJMU Emblem"
+              width={44}
+              height={44}
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="w-11 h-11 rounded-full p-0.5 shrink-0 flex items-center justify-center">
+            <Image
+              src="/assets/samvad-emblem.png"
+              alt="SAMVAD Emblem"
+              width={44}
+              height={44}
+              className="w-full h-full object-contain"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Search Input Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-7">
         <form onSubmit={handleSearch} className="space-y-4">
           <div>
             <label htmlFor="trackingId" className="block text-xs font-bold text-slate-700 mb-1.5">

@@ -7,9 +7,9 @@ export function WorkflowSteps() {
       step: "01",
       level: "Tier 1",
       title: "Course Coordinator",
-      role: "Faculty Level Redressal",
-      icon: <UserCheck className="w-5 h-5 text-csjmu-700" aria-hidden="true" />,
-      accent: "from-blue-600 to-csjmu-700",
+      role: "Course Level Review",
+      icon: <UserCheck className="w-5 h-5 text-csjmu-800" aria-hidden="true" />,
+      accentColor: "bg-csjmu-700",
       description:
         "Initial evaluation of course-specific academic grievances. Authorized to review proofs, request supplementary documents from the student, record internal notes, resolve directly, or forward to HoD.",
       actions: ["Document Clarification Request", "Internal Faculty Remarks", "Direct Resolution", "Forward to HoD"],
@@ -19,8 +19,8 @@ export function WorkflowSteps() {
       level: "Tier 2",
       title: "Department Head (HoD)",
       role: "Departmental Adjudication",
-      icon: <Building2 className="w-5 h-5 text-csjmu-700" aria-hidden="true" />,
-      accent: "from-csjmu-700 to-csjmu-900",
+      icon: <Building2 className="w-5 h-5 text-csjmu-800" aria-hidden="true" />,
+      accentColor: "bg-csjmu-900",
       description:
         "Departmental oversight across all courses. Reviews escalated complaints, conducts departmental inquiries, requests further evidence, adds department findings, resolves, or refers to the School Director.",
       actions: ["Cross-Course Inquiries", "Evidence Verification", "Departmental Resolution", "Escalate to Director"],
@@ -31,7 +31,7 @@ export function WorkflowSteps() {
       title: "Director SBS",
       role: "School Appellate Authority",
       icon: <Award className="w-5 h-5 text-gold-600" aria-hidden="true" />,
-      accent: "from-gold-500 to-amber-600",
+      accentColor: "bg-gold-500",
       description:
         "Highest authority within the School of Basic Sciences. Reviews escalated petitions, convenes academic grievance hearings, provides executive directives, and issues final institutional resolution.",
       actions: ["Appellate Review", "Executive Directives", "Final Institutional Resolution", "Statutory Closure"],
@@ -39,15 +39,15 @@ export function WorkflowSteps() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
-        {tiers.map((tier, idx) => (
+        {tiers.map((tier) => (
           <div
             key={tier.level}
-            className="bg-white rounded-2xl border border-slate-200/90 shadow-sm hover:shadow-md transition-all duration-300 p-6 flex flex-col justify-between relative overflow-hidden group"
+            className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between relative overflow-hidden"
           >
-            {/* Top Indicator */}
-            <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${tier.accent}`} />
+            {/* Top Academic Accent Line */}
+            <div className={`absolute top-0 left-0 right-0 h-1.5 ${tier.accentColor}`} />
 
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -55,16 +55,16 @@ export function WorkflowSteps() {
                   <span className="text-xs font-mono font-bold text-slate-400">
                     STEP {tier.step}
                   </span>
-                  <span className="text-xs font-bold tracking-wider uppercase bg-csjmu-50 text-csjmu-800 px-2.5 py-0.5 rounded-full border border-csjmu-100">
+                  <span className="text-xs font-bold tracking-wider uppercase bg-slate-100 text-csjmu-900 px-2.5 py-0.5 rounded border border-slate-200">
                     {tier.level}
                   </span>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center group-hover:scale-105 group-hover:bg-csjmu-50 transition-all">
+                <div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center">
                   {tier.icon}
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold text-slate-900 group-hover:text-csjmu-900 transition-colors">
+              <h3 className="text-lg font-bold text-slate-900">
                 {tier.title}
               </h3>
               <p className="text-xs font-semibold text-csjmu-700 mt-0.5">{tier.role}</p>
@@ -75,7 +75,7 @@ export function WorkflowSteps() {
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-100">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2.5">
                 Statutory Authority &amp; Actions
               </span>
               <ul className="space-y-2">
@@ -92,7 +92,7 @@ export function WorkflowSteps() {
       </div>
 
       {/* Process Guarantee Callout */}
-      <div className="bg-gradient-to-r from-csjmu-950 via-csjmu-900 to-csjmu-950 text-white rounded-xl p-5 border border-csjmu-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs shadow-md">
+      <div className="bg-csjmu-900 text-white rounded-xl p-5 border border-csjmu-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-gold-400">
             <FileCheck className="w-4 h-4" aria-hidden="true" />
@@ -100,11 +100,11 @@ export function WorkflowSteps() {
           <div>
             <strong className="text-white block font-semibold">Deterministic Accountability &amp; Immutable Audit Trail</strong>
             <span className="text-slate-300 text-[11px] mt-0.5 block">
-              Every status update, document request, and officer remark is cryptographically linked with timestamped audit records. Zero algorithmic triage.
+              Every status update, document request, and officer remark is cryptographically linked with timestamped audit records. Zero automated triage.
             </span>
           </div>
         </div>
-        <div className="shrink-0 flex items-center gap-2 bg-white/10 px-3.5 py-1.5 rounded-full border border-white/15 text-gold-300 font-semibold text-[11px]">
+        <div className="shrink-0 flex items-center gap-2 bg-csjmu-950 px-3.5 py-1.5 rounded-md border border-csjmu-800 text-gold-300 font-semibold text-[11px]">
           <span>Tier 1 (Course)</span>
           <ArrowRight className="w-3 h-3 text-gold-400" aria-hidden="true" />
           <span>Tier 2 (HoD)</span>

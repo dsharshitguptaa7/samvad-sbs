@@ -2,10 +2,10 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import {
   LogIn,
-  Shield,
   GraduationCap,
   Briefcase,
   AlertCircle,
@@ -66,7 +66,6 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
 
       setSuccessMessage("Authenticated successfully! Loading portal workspace...");
 
-      // Authoritative redirect using full document navigation to guarantee clean session sync
       const destination = data.redirectUrl || getRoleDashboardPath(data.user?.role);
       setTimeout(() => {
         window.location.href = destination;
@@ -78,18 +77,44 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-12 space-y-6">
-      {/* Page Title */}
-      <div className="text-center space-y-2">
-        <div className="w-12 h-12 mx-auto rounded-xl bg-csjmu-900 border border-csjmu-800 flex items-center justify-center text-gold-400 shadow-md">
-          <Shield className="w-7 h-7" aria-hidden="true" />
+    <div className="max-w-md mx-auto px-4 py-10 space-y-6">
+      {/* Official University Identity Header */}
+      <div className="text-center space-y-3">
+        <div className="flex items-center justify-center gap-3">
+          <div className="w-12 h-12 bg-white rounded-full p-1 border border-gold-500/60 shadow-sm shrink-0 flex items-center justify-center">
+            <Image
+              src="/assets/csjmu-emblem.png"
+              alt="CSJMU University Seal"
+              width={48}
+              height={48}
+              priority
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="h-8 w-px bg-slate-300 shrink-0" aria-hidden="true" />
+          <div className="w-12 h-12 rounded-full p-0.5 shrink-0 flex items-center justify-center">
+            <Image
+              src="/assets/samvad-emblem.png"
+              alt="SAMVAD Portal Emblem"
+              width={48}
+              height={48}
+              priority
+              className="w-full h-full object-contain"
+            />
+          </div>
         </div>
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-          SAMVAD Portal Sign In
-        </h1>
-        <p className="text-xs text-slate-600">
-          School of Basic Sciences &bull; CSJMU Kanpur
-        </p>
+
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight font-serif">
+            SAMVAD Portal Login
+          </h1>
+          <p className="text-xs font-semibold text-csjmu-800 uppercase tracking-wider mt-0.5">
+            School of Basic Sciences &bull; CSJMU Kanpur
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Statutory Academic Grievance Redressal System
+          </p>
+        </div>
       </div>
 
       {/* Error / Success Alerts */}
@@ -97,7 +122,7 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
         <div
           role="alert"
           aria-live="assertive"
-          className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-900 flex items-start gap-2.5"
+          className="p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-900 flex items-start gap-2.5"
         >
           <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
@@ -111,7 +136,7 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
         <div
           role="status"
           aria-live="polite"
-          className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 flex items-start gap-2.5"
+          className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 flex items-start gap-2.5"
         >
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
@@ -122,10 +147,10 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
       )}
 
       {/* Login Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 sm:p-7 space-y-5">
         {/* Role Selector Tabs */}
         <div
-          className="flex rounded-lg bg-slate-100 p-1 border border-slate-200"
+          className="flex rounded-md bg-slate-100 p-1 border border-slate-200"
           role="tablist"
           aria-label="Login user type"
         >
@@ -137,7 +162,7 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
               setActiveTab("student");
               setErrorMessage(null);
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-bold transition cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded text-xs font-bold transition cursor-pointer ${
               activeTab === "student"
                 ? "bg-white text-csjmu-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -155,67 +180,66 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
               setActiveTab("staff");
               setErrorMessage(null);
             }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-bold transition cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded text-xs font-bold transition cursor-pointer ${
               activeTab === "staff"
                 ? "bg-white text-csjmu-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <Briefcase className="w-4 h-4" aria-hidden="true" />
-            <span>Faculty & Staff</span>
+            <span>Faculty / Officer</span>
           </button>
         </div>
 
-        {/* Tab Description */}
-        <div className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-100">
-          {activeTab === "student" ? (
-            <p>
-              Access your student grievance dashboard, view coordinator remarks, and respond to document requests.
-            </p>
-          ) : (
-            <p>
-              Authorized access for <strong>Course Coordinators</strong>, <strong>Department Heads</strong>, <strong>Director SBS</strong>, and <strong>Administrators</strong>.
-            </p>
-          )}
-        </div>
-
-        {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="identifier" className="block text-xs font-semibold text-slate-700 mb-1">
-              {activeTab === "student" ? "CSJMU Roll Number or Email" : "Institutional Email ID"}{" "}
-              <span className="text-rose-500">*</span>
+            <label htmlFor="identifier" className="block text-xs font-bold text-slate-700 mb-1">
+              {activeTab === "student"
+                ? "Email Address, Roll Number, or Enrollment No."
+                : "Official Institutional Email Address"}
             </label>
             <input
               id="identifier"
               name="identifier"
               type="text"
               required
-              placeholder={activeTab === "student" ? "e.g. 240103001 or email" : "official@csjmu.ac.in"}
-              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+              autoComplete="username"
+              placeholder={
+                activeTab === "student"
+                  ? "e.g. 2301234567 or student@csjmu.ac.in"
+                  : "e.g. hod.math@csjmu.ac.in"
+              }
+              className="w-full px-3.5 py-2 text-xs rounded-md border border-slate-300 focus:border-csjmu-700 focus:ring-1 focus:ring-csjmu-700 outline-none transition"
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label htmlFor="password" className="block text-xs font-semibold text-slate-700">
-                Password <span className="text-rose-500">*</span>
+              <label htmlFor="password" className="block text-xs font-bold text-slate-700">
+                Password
               </label>
+              <Link
+                href="/reset-password"
+                className="text-[11px] text-csjmu-700 hover:text-csjmu-900 hover:underline font-medium"
+              >
+                Forgot Password?
+              </Link>
             </div>
             <input
               id="password"
               name="password"
               type="password"
               required
-              placeholder="Enter account password"
-              className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:border-csjmu-600 focus:ring-1 focus:ring-csjmu-600"
+              autoComplete="current-password"
+              placeholder="••••••••••••"
+              className="w-full px-3.5 py-2 text-xs rounded-md border border-slate-300 focus:border-csjmu-700 focus:ring-1 focus:ring-csjmu-700 outline-none transition"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-bold text-csjmu-950 bg-gold-400 hover:bg-gold-500 transition shadow-sm focus-visible:ring-csjmu-600 disabled:opacity-50 cursor-pointer mt-2"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider text-csjmu-950 bg-gold-400 hover:bg-gold-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
           >
             {loading ? (
               <>
@@ -225,26 +249,37 @@ export function LoginForm({ initialRedirect, initialError }: LoginFormProps) {
             ) : (
               <>
                 <LogIn className="w-4 h-4" aria-hidden="true" />
-                <span>Sign In to {activeTab === "student" ? "Student Account" : "Staff Console"}</span>
+                <span>Sign In to Workspace</span>
               </>
             )}
           </button>
         </form>
 
-        {/* Footer Info */}
-        <div className="pt-4 border-t border-slate-100 text-center space-y-2 text-xs">
+        <div className="pt-4 border-t border-slate-100 text-center space-y-2">
           {activeTab === "student" ? (
-            <p className="text-slate-600">
-              New to SBS SAMVAD?{" "}
-              <Link href="/register" className="text-csjmu-800 font-bold hover:underline">
-                Register as Student
+            <p className="text-xs text-slate-600">
+              New student in School of Basic Sciences?{" "}
+              <Link
+                href="/register"
+                className="font-bold text-csjmu-800 hover:text-csjmu-950 hover:underline"
+              >
+                Create Student Account
               </Link>
             </p>
           ) : (
-            <p className="text-slate-500 text-[11px] leading-relaxed">
-              Faculty and officer accounts are managed by the System Administrator. Contact SBS IT Office for initial credentials.
+            <p className="text-[11px] text-slate-500">
+              Staff, Coordinators, Department Heads &amp; Directors use their university-assigned credentials.
             </p>
           )}
+
+          <div className="pt-2">
+            <Link
+              href="/track"
+              className="inline-block text-xs font-medium text-slate-500 hover:text-csjmu-800 transition"
+            >
+              Have a Tracking Number? Track without signing in &rarr;
+            </Link>
+          </div>
         </div>
       </div>
     </div>

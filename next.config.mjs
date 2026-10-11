@@ -7,12 +7,14 @@ const nextConfig = {
   },
   async rewrites() {
     const fastApiUrl = process.env.FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${fastApiUrl}/api/:path*`,
-      },
-    ];
+    return {
+      beforeFiles: [
+        {
+          source: "/api/:path*",
+          destination: `${fastApiUrl}/api/:path*`,
+        },
+      ],
+    };
   },
   async headers() {
     return [

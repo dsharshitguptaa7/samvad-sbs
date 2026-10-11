@@ -23,8 +23,13 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", os.getenv("NODE_ENV", "development"))
     FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
     
-    # Storage Configuration
-    STORAGE_LOCAL_DIR: str = os.getenv("STORAGE_LOCAL_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".storage", "grievances")))
+    # Storage Configuration: use env var, or Render persistent disk at /var/data, or local dev fallback
+    STORAGE_LOCAL_DIR: str = os.getenv(
+        "STORAGE_LOCAL_DIR",
+        "/var/data/samvad/storage/grievances"
+        if os.path.exists("/var/data")
+        else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".storage", "grievances"))
+    )
     MAX_FILE_SIZE_BYTES: int = 5 * 1024 * 1024  # 5MB
 
     @property

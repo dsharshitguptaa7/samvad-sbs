@@ -1,7 +1,9 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from backend.app.core.config import settings
+from backend.app.services.storage import storage_service
 from backend.app.routers import (
     auth,
     departments,
@@ -14,11 +16,18 @@ from backend.app.routers import (
     admin,
 )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Verify persistent storage directory existence and write permissions on startup
+    storage_service.verify_storage_health()
+    yield
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS Middleware configured strictly for exact frontend origin with credentials

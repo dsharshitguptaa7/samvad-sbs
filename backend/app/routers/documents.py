@@ -8,6 +8,7 @@ from backend.app.services.storage import storage_service
 router = APIRouter(prefix="/documents", tags=["Evidence Documents"])
 
 @router.get("/{id}")
+@router.get("/{id}/download")
 async def get_document(
     id: str,
     current_user: User = Depends(get_current_user),

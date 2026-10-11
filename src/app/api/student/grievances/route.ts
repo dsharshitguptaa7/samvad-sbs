@@ -13,6 +13,29 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   try {
+    const fastApiUrl = process.env.FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (fastApiUrl) {
+      const forwardHeaders = new Headers();
+      const cookie = req.headers.get("cookie");
+      if (cookie) forwardHeaders.set("cookie", cookie);
+      const auth = req.headers.get("authorization");
+      if (auth) forwardHeaders.set("authorization", auth);
+      const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip");
+      if (ip) forwardHeaders.set("x-forwarded-for", ip);
+      const ua = req.headers.get("user-agent");
+      if (ua) forwardHeaders.set("user-agent", ua);
+
+      const formData = await req.formData();
+      const res = await fetch(`${fastApiUrl}/api/student/grievances`, {
+        method: "POST",
+        headers: forwardHeaders,
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      return NextResponse.json(data, { status: res.status });
+    }
+
     const user = await requireRole([UserRole.STUDENT]);
 
     const formData = await req.formData();
